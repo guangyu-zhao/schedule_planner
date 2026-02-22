@@ -1,5 +1,8 @@
 let currentUser = null;
 
+function t(k, p) { return (window.I18n && window.I18n.t) ? window.I18n.t(k, p) : k; }
+function translateError(msg) { return (window.I18n && window.I18n.translateError) ? window.I18n.translateError(msg) : msg; }
+
 async function loadCurrentUser() {
     try {
         const res = await fetch('/api/auth/me');
@@ -12,6 +15,9 @@ async function loadCurrentUser() {
         }
         const data = await res.json();
         currentUser = data.user;
+        if (currentUser && currentUser.language && window.I18n && window.I18n.setLanguage) {
+            window.I18n.setLanguage(currentUser.language);
+        }
         updateUserUI();
     } catch { /* ignore */ }
 }
@@ -19,13 +25,14 @@ async function loadCurrentUser() {
 function updateUserUI() {
     if (!currentUser) return;
 
+    const userLabel = t('user.default');
     const initial = (currentUser.username || currentUser.email || 'U').charAt(0).toUpperCase();
 
-    document.getElementById('userNameText').textContent = currentUser.username || '用户';
+    document.getElementById('userNameText').textContent = currentUser.username || userLabel;
     document.getElementById('userAvatarInitial').textContent = initial;
     document.getElementById('dropdownAvatarInitial').textContent = initial;
     document.getElementById('profileAvatarInitial').textContent = initial;
-    document.getElementById('dropdownUsername').textContent = currentUser.username || '用户';
+    document.getElementById('dropdownUsername').textContent = currentUser.username || userLabel;
     document.getElementById('dropdownEmail').textContent = currentUser.email;
 
     if (currentUser.avatar) {
@@ -75,6 +82,18 @@ function openProfile() {
     document.getElementById('pwdOld').value = '';
     document.getElementById('pwdNew').value = '';
     document.getElementById('pwdConfirm').value = '';
+
+    const langSelect = document.getElementById('profileLanguage');
+    if (langSelect && window.I18n && window.I18n.LANGUAGES) {
+        langSelect.innerHTML = '';
+        window.I18n.LANGUAGES.forEach(lang => {
+            const opt = document.createElement('option');
+            opt.value = lang.code;
+            opt.textContent = lang.name;
+            langSelect.appendChild(opt);
+        });
+        langSelect.value = currentUser?.language || (window.I18n.getLanguage ? window.I18n.getLanguage() : 'en');
+    }
 }
 
 function closeProfile() {
@@ -88,28 +107,38 @@ document.getElementById('profileOverlay')?.addEventListener('click', e => {
 async function saveProfile() {
     const username = document.getElementById('profileUsername').value.trim();
     const bio = document.getElementById('profileBio').value.trim();
+    const langSelect = document.getElementById('profileLanguage');
+    const language = langSelect ? langSelect.value : null;
 
     if (!username || username.length < 2) {
-        showProfileToast('用户名长度需在 2-30 个字符之间', 'error');
+        showProfileToast(t('error.usernameLength'), 'error');
         return;
     }
+
+    const prevLang = window.I18n && window.I18n.getLanguage ? window.I18n.getLanguage() : 'en';
+    const langChanged = language && language !== prevLang;
 
     try {
         const res = await fetch('/api/user/profile', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, bio }),
+            body: JSON.stringify({ username, bio, language: language || undefined }),
         });
         const data = await res.json();
         if (!res.ok) {
-            showProfileToast(data.error || '保存失败', 'error');
+            showProfileToast(translateError(data.error) || t('profile.saveFailed'), 'error');
             return;
         }
         currentUser = data.user;
         updateUserUI();
-        showProfileToast('资料已更新');
+        showProfileToast(t('profile.saved'));
+
+        if (langChanged && language && window.I18n && window.I18n.setLanguage) {
+            window.I18n.setLanguage(language);
+            window.location.reload();
+        }
     } catch {
-        showProfileToast('网络错误', 'error');
+        showProfileToast(t('toast.networkError'), 'error');
     }
 }
 
@@ -118,7 +147,7 @@ async function handleAvatarUpload(input) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-        showProfileToast('文件大小不能超过 5MB', 'error');
+        showProfileToast(translateError('上传文件过大，最大 5MB') || t('error.fileTooLarge'), 'error');
         input.value = '';
         return;
     }
@@ -133,14 +162,14 @@ async function handleAvatarUpload(input) {
         });
         const data = await res.json();
         if (!res.ok) {
-            showProfileToast(data.error || '上传失败', 'error');
+            showProfileToast(translateError(data.error) || t('profile.uploadFailed'), 'error');
             return;
         }
         currentUser.avatar = data.avatar;
         updateUserUI();
-        showProfileToast('头像已更新');
+        showProfileToast(t('profile.avatarUpdated'));
     } catch {
-        showProfileToast('上传失败', 'error');
+        showProfileToast(t('profile.uploadFailed'), 'error');
     }
     input.value = '';
 }
@@ -151,11 +180,11 @@ async function changePassword() {
     const confirmPwd = document.getElementById('pwdConfirm').value;
 
     if (!oldPwd || !newPwd || !confirmPwd) {
-        showProfileToast('请填写所有密码字段', 'error');
+        showProfileToast(t('profile.fillAllPassword'), 'error');
         return;
     }
     if (newPwd !== confirmPwd) {
-        showProfileToast('两次输入的新密码不一致', 'error');
+        showProfileToast(t('auth.passwordMismatch'), 'error');
         return;
     }
 
@@ -171,15 +200,15 @@ async function changePassword() {
         });
         const data = await res.json();
         if (!res.ok) {
-            showProfileToast(data.error || '修改失败', 'error');
+            showProfileToast(translateError(data.error) || t('profile.saveFailed'), 'error');
             return;
         }
         document.getElementById('pwdOld').value = '';
         document.getElementById('pwdNew').value = '';
         document.getElementById('pwdConfirm').value = '';
-        showProfileToast('密码修改成功');
+        showProfileToast(t('profile.passwordChanged'));
     } catch {
-        showProfileToast('网络错误', 'error');
+        showProfileToast(t('toast.networkError'), 'error');
     }
 }
 
@@ -197,9 +226,9 @@ async function exportData() {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        showProfileToast('数据导出成功');
+        showProfileToast(t('profile.exportSuccess'));
     } catch {
-        showProfileToast('导出失败', 'error');
+        showProfileToast(t('profile.exportFailed'), 'error');
     }
 }
 
@@ -217,9 +246,9 @@ async function exportCSV() {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        showProfileToast('CSV 数据导出成功');
+        showProfileToast(t('profile.csvExportSuccess'));
     } catch {
-        showProfileToast('CSV 导出失败', 'error');
+        showProfileToast(t('profile.csvExportFailed'), 'error');
     }
 }
 
@@ -237,9 +266,9 @@ async function exportICal() {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        showProfileToast('iCal 日历导出成功');
+        showProfileToast(t('profile.icalExportSuccess'));
     } catch {
-        showProfileToast('iCal 导出失败', 'error');
+        showProfileToast(t('profile.icalExportFailed'), 'error');
     }
 }
 
@@ -256,7 +285,7 @@ async function importData() {
             text = await file.text();
             JSON.parse(text);
         } catch {
-            showProfileToast('文件格式不正确，请选择有效的 JSON 文件', 'error');
+            showProfileToast(t('profile.invalidFile'), 'error');
             return;
         }
         try {
@@ -267,14 +296,14 @@ async function importData() {
             });
             const result = await res.json();
             if (!res.ok) {
-                showProfileToast(result.error || '导入失败', 'error');
+                showProfileToast(translateError(result.error) || t('profile.importFailed'), 'error');
                 return;
             }
-            showProfileToast(result.message);
+            showProfileToast(result.message || t('profile.importSuccess'));
             if (window.planner) { window.planner.fetchEvents(); window.planner.fetchNote(); }
             if (window.timer) { window.timer.fetchRecords(); window.timer.fetchStats(); }
         } catch {
-            showProfileToast('网络错误，导入失败', 'error');
+            showProfileToast(t('profile.importNetworkError'), 'error');
         }
     };
     input.click();
@@ -290,13 +319,14 @@ function deleteAccount() {
 async function confirmDeleteAccount() {
     const password = document.getElementById('deleteAccountPwd').value;
     if (!password) {
-        document.getElementById('deleteAccountError').textContent = '请输入密码';
+        document.getElementById('deleteAccountError').textContent = t('deleteAccount.enterPassword');
         return;
     }
 
     const btn = document.getElementById('confirmDeleteAccountBtn');
+    const confirmText = t('deleteAccount.confirm');
     btn.disabled = true;
-    btn.textContent = '删除中...';
+    btn.textContent = t('deleteAccount.deleting');
 
     try {
         const res = await fetch('/api/user/delete-account', {
@@ -306,15 +336,15 @@ async function confirmDeleteAccount() {
         });
         const data = await res.json();
         if (!res.ok) {
-            document.getElementById('deleteAccountError').textContent = data.error || '删除失败';
+            document.getElementById('deleteAccountError').textContent = translateError(data.error) || t('deleteAccount.deleteFailed');
             return;
         }
         window.location.href = '/login';
     } catch {
-        document.getElementById('deleteAccountError').textContent = '网络错误';
+        document.getElementById('deleteAccountError').textContent = t('deleteAccount.networkError');
     } finally {
         btn.disabled = false;
-        btn.textContent = '确认删除';
+        btn.textContent = confirmText;
     }
 }
 

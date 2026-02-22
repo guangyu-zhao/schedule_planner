@@ -4,24 +4,24 @@
             <div class="timer-cal" id="timerCal"></div>
             <div class="timer-date-label" id="timerDateLabel"></div>
             <div class="timer-stats-card">
-                <h3>专注统计</h3>
+                <h3 data-i18n="timer.focusStats">Focus Stats</h3>
                 <div class="timer-stats-grid">
-                    <div class="ts-item"><div class="ts-value" id="tsFocusTime">0分钟</div><div class="ts-label">总专注</div></div>
-                    <div class="ts-item"><div class="ts-value" id="tsTaskCount">0</div><div class="ts-label">任务数</div></div>
-                    <div class="ts-item"><div class="ts-value" id="tsCompleted">0</div><div class="ts-label">已完成</div></div>
+                    <div class="ts-item"><div class="ts-value" id="tsFocusTime">0 min</div><div class="ts-label" data-i18n="timer.totalFocus">Total Focus</div></div>
+                    <div class="ts-item"><div class="ts-value" id="tsTaskCount">0</div><div class="ts-label" data-i18n="timer.taskCount">Tasks</div></div>
+                    <div class="ts-item"><div class="ts-value" id="tsCompleted">0</div><div class="ts-label" data-i18n="timer.completed">Completed</div></div>
                 </div>
             </div>
             <div class="timer-records-card">
-                <h3>条目记录</h3>
+                <h3 data-i18n="timer.records">Records</h3>
                 <div class="timer-records-list" id="timerRecordsList">
-                    <div class="timer-records-empty">暂无记录</div>
+                    <div class="timer-records-empty" data-i18n="timer.noRecords">No records</div>
                 </div>
             </div>
         </div>
         <div class="timer-main">
             <div class="timer-setup" id="timerSetup">
                 <input type="text" class="timer-task-input" id="timerTaskName"
-                       placeholder="输入任务名称..." maxlength="200">
+                       data-i18n-placeholder="timer.taskPlaceholder" placeholder="Enter task name..." maxlength="200">
                 <div class="timer-ring-wrap">
                     <svg class="timer-ring" width="280" height="280" viewBox="0 0 280 280">
                         <circle cx="140" cy="140" r="126" fill="none" stroke="var(--border-color)" stroke-width="7" />
@@ -32,7 +32,7 @@
                     </svg>
                     <div class="timer-ring-center">
                         <div class="timer-display" id="timerDisplay">25:00</div>
-                        <div class="timer-state-label" id="timerStateLabel">准备开始</div>
+                        <div class="timer-state-label" id="timerStateLabel" data-i18n="timer.ready">Ready</div>
                     </div>
                 </div>
                 <div class="timer-adjuster">
@@ -40,37 +40,37 @@
                     <button class="adj-btn" id="timerPlus5">+5</button>
                 </div>
                 <div class="timer-presets">
-                    <button class="preset-btn" data-min="15">15分</button>
-                    <button class="preset-btn active" data-min="25">25分</button>
-                    <button class="preset-btn" data-min="45">45分</button>
-                    <button class="preset-btn" data-min="60">60分</button>
+                    <button class="preset-btn" data-min="15" data-i18n="timer.preset15">15 min</button>
+                    <button class="preset-btn active" data-min="25" data-i18n="timer.preset25">25 min</button>
+                    <button class="preset-btn" data-min="45" data-i18n="timer.preset45">45 min</button>
+                    <button class="preset-btn" data-min="60" data-i18n="timer.preset60">60 min</button>
                 </div>
-                <button class="timer-start-btn" id="timerStartBtn">▶ 开始专注</button>
+                <button class="timer-start-btn" id="timerStartBtn">▶ <span data-i18n="timer.start">Start Focus</span></button>
             </div>
             <div class="timer-controls" id="timerControls" style="display:none">
-                <button class="ctrl-btn ctrl-pause" id="timerPauseBtn">⏸ 暂停</button>
-                <button class="ctrl-btn ctrl-add" id="timerAdd5">+5分</button>
-                <button class="ctrl-btn ctrl-add" id="timerAdd30">+30分</button>
-                <button class="ctrl-btn ctrl-stop" id="timerStopBtn">⏹ 停止</button>
+                <button class="ctrl-btn ctrl-pause" id="timerPauseBtn">⏸ <span data-i18n="timer.pause">Pause</span></button>
+                <button class="ctrl-btn ctrl-add" id="timerAdd5" data-i18n="timer.add5">+5 min</button>
+                <button class="ctrl-btn ctrl-add" id="timerAdd30" data-i18n="timer.add30">+30 min</button>
+                <button class="ctrl-btn ctrl-stop" id="timerStopBtn">⏹ <span data-i18n="timer.stop">Stop</span></button>
             </div>
             <div class="pomodoro-panel">
                 <div class="pomodoro-indicator" id="pomodoroIndicator"></div>
                 <div class="pomodoro-settings">
                     <label class="auto-break-toggle">
                         <input type="checkbox" id="autoBreakToggle" checked>
-                        <span>自动休息（短5分/长15分）</span>
+                        <span data-i18n="timer.autoBreak">Auto break (short 5 min / long 15 min)</span>
                     </label>
-                    <button class="pomo-reset-btn" id="resetPomodoroBtn" title="重置番茄钟计数">↺ 重置</button>
+                    <button class="pomo-reset-btn" id="resetPomodoroBtn" data-i18n-title="timer.resetPomodoro" title="Reset pomodoro count">↺ Reset</button>
                 </div>
             </div>
             <div class="ambient-sound-panel">
-                <div class="ambient-header">🎵 环境音</div>
+                <div class="ambient-header">🎵 <span data-i18n="timer.ambientSound">Ambient Sound</span></div>
                 <div class="ambient-buttons">
-                    <button class="ambient-btn" data-sound="none" title="静音">🔇</button>
-                    <button class="ambient-btn" data-sound="rain" title="雨声">🌧️</button>
-                    <button class="ambient-btn" data-sound="forest" title="森林">🌲</button>
-                    <button class="ambient-btn" data-sound="cafe" title="咖啡馆">☕</button>
-                    <button class="ambient-btn" data-sound="whitenoise" title="白噪音">〰️</button>
+                    <button class="ambient-btn" data-sound="none" data-i18n-title="timer.mute" title="Mute">🔇</button>
+                    <button class="ambient-btn" data-sound="rain" data-i18n-title="timer.rain" title="Rain">🌧️</button>
+                    <button class="ambient-btn" data-sound="forest" data-i18n-title="timer.forest" title="Forest">🌲</button>
+                    <button class="ambient-btn" data-sound="cafe" data-i18n-title="timer.cafe" title="Cafe">☕</button>
+                    <button class="ambient-btn" data-sound="whitenoise" data-i18n-title="timer.whitenoise" title="White noise">〰️</button>
                 </div>
                 <div class="ambient-volume">
                     <span class="ambient-vol-label">🔊</span>

@@ -187,6 +187,14 @@ def delete_event(event_id):
         return jsonify({"error": "事件不存在"}), 404
     event_data = dict(event)
 
+    conn.execute(
+        """INSERT INTO deleted_events (user_id, original_id, title, description, date,
+           start_time, end_time, color, category, priority, completed, col_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (g.user_id, event["id"], event["title"], event["description"], event["date"],
+         event["start_time"], event["end_time"], event["color"],
+         event["category"], event["priority"], event["completed"], event["col_type"]),
+    )
     conn.execute("DELETE FROM events WHERE id=? AND user_id=?", (event_id, g.user_id))
     conn.commit()
     return jsonify({"success": True, "event": event_data})
@@ -299,10 +307,26 @@ def generate_recurring():
 def _expand_recur(rule, base_date, start_dt, end_dt):
     """Return list of dates that match a recurrence rule within a range."""
     dates = []
-    d = base_date + timedelta(days=1)
-    limit = 90
-    count = 0
+    limit = 366
 
+    if rule == "monthly":
+        d = base_date
+        for _ in range(limit):
+            if d.month == 12:
+                next_year, next_mon = d.year + 1, 1
+            else:
+                next_year, next_mon = d.year, d.month + 1
+            max_day = calendar.monthrange(next_year, next_mon)[1]
+            d = d.replace(year=next_year, month=next_mon,
+                          day=min(base_date.day, max_day))
+            if d > end_dt:
+                break
+            if d >= start_dt:
+                dates.append(d)
+        return dates
+
+    d = base_date + timedelta(days=1)
+    count = 0
     while d <= end_dt and count < limit:
         if d >= start_dt:
             if rule == "daily":
@@ -313,19 +337,7 @@ def _expand_recur(rule, base_date, start_dt, end_dt):
             elif rule == "weekly":
                 if d.weekday() == base_date.weekday():
                     dates.append(d)
-            elif rule == "monthly":
-                if d.day == base_date.day:
-                    dates.append(d)
-        if rule == "monthly":
-            if d.month == (d + timedelta(days=1)).month:
-                d += timedelta(days=1)
-            else:
-                next_first = d.replace(day=1) + timedelta(days=32)
-                next_month = next_first.replace(day=1)
-                max_day = calendar.monthrange(next_month.year, next_month.month)[1]
-                d = next_month.replace(day=min(base_date.day, max_day))
-        else:
-            d += timedelta(days=1)
+        d += timedelta(days=1)
         count += 1
 
     return dates

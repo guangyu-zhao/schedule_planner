@@ -20,6 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.timer = new TimerManager();
     window.stats = new StatisticsManager();
 
+    if (window.I18n) {
+        if (window.I18n.applyTranslations) window.I18n.applyTranslations();
+        if (window.I18n.t) document.title = window.I18n.t('app.title');
+    }
+
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') return;
         const activePage = document.querySelector('.page.active');

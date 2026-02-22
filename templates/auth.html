@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日程规划器 - 登录</title>
+    <title>Schedule Planner - Login</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
     <link rel="stylesheet" href="/static/css/auth.css">
 </head>
@@ -12,105 +12,110 @@
         <div class="auth-left">
             <div class="auth-brand">
                 <div class="auth-logo">📅</div>
-                <h1>日程规划器</h1>
-                <p class="auth-tagline">高效管理时间，专注成就目标</p>
+                <h1 data-i18n="auth.brand">Schedule Planner</h1>
+                <p class="auth-tagline" data-i18n="auth.tagline">Manage time efficiently, stay focused on your goals</p>
             </div>
             <div class="auth-features">
                 <div class="auth-feature">
                     <span class="feature-icon">📋</span>
                     <div>
-                        <strong>日程安排</strong>
-                        <p>计划与实际执行双栏对照，让每一天清晰可见</p>
+                        <strong data-i18n="auth.feature.schedule">Schedule</strong>
+                        <p data-i18n="auth.feature.schedule.desc">Plan vs. actual dual-column view, making every day crystal clear</p>
                     </div>
                 </div>
                 <div class="auth-feature">
                     <span class="feature-icon">⏱️</span>
                     <div>
-                        <strong>专注计时</strong>
-                        <p>番茄钟式专注计时，记录每一段深度工作</p>
+                        <strong data-i18n="auth.feature.timer">Focus Timer</strong>
+                        <p data-i18n="auth.feature.timer.desc">Pomodoro-style focus timer, recording every deep work session</p>
                     </div>
                 </div>
                 <div class="auth-feature">
                     <span class="feature-icon">📊</span>
                     <div>
-                        <strong>数据统计</strong>
-                        <p>多维度可视化分析，洞察时间使用趋势</p>
+                        <strong data-i18n="auth.feature.stats">Statistics</strong>
+                        <p data-i18n="auth.feature.stats.desc">Multi-dimensional visual analytics, insights into time usage trends</p>
                     </div>
                 </div>
             </div>
         </div>
         <div class="auth-right">
+            <div class="auth-lang-select">
+                <select id="langSelect" onchange="changeAuthLanguage(this.value)">
+                    <!-- options populated by JS -->
+                </select>
+            </div>
             <!-- Login Form -->
             <div class="auth-form-wrap active" id="loginForm">
-                <h2>欢迎回来</h2>
-                <p class="auth-subtitle">登录您的账户继续使用</p>
+                <h2 data-i18n="auth.login.title">Welcome Back</h2>
+                <p class="auth-subtitle" data-i18n="auth.login.subtitle">Sign in to your account to continue</p>
                 <form onsubmit="return handleLogin(event)">
                     <div class="auth-field">
-                        <label for="loginEmail">邮箱</label>
+                        <label for="loginEmail" data-i18n="auth.email">Email</label>
                         <input type="email" id="loginEmail" placeholder="your@email.com" required autocomplete="email">
                     </div>
                     <div class="auth-field">
-                        <label for="loginPassword">密码</label>
-                        <input type="password" id="loginPassword" placeholder="输入密码" required autocomplete="current-password">
+                        <label for="loginPassword" data-i18n="auth.password">Password</label>
+                        <input type="password" id="loginPassword" data-i18n-placeholder="auth.password.placeholder" placeholder="Enter password" required autocomplete="current-password">
                     </div>
                     <div class="auth-options">
                         <label class="auth-checkbox">
                             <input type="checkbox" id="loginRemember" checked>
-                            <span>记住登录</span>
+                            <span data-i18n="auth.remember">Remember me</span>
                         </label>
-                        <a href="#" class="auth-link" onclick="showForm('forgot')">忘记密码？</a>
+                        <a href="#" class="auth-link" onclick="showForm('forgot')" data-i18n="auth.forgot">Forgot password?</a>
                     </div>
                     <div class="auth-error" id="loginError"></div>
-                    <button type="submit" class="auth-btn" id="loginBtn">登录</button>
+                    <button type="submit" class="auth-btn" id="loginBtn" data-i18n="auth.login.btn">Sign In</button>
                 </form>
                 <div class="auth-switch">
-                    还没有账户？<a href="#" onclick="showForm('register')">立即注册</a>
+                    <span data-i18n="auth.login.noAccount">Don't have an account?</span> <a href="#" onclick="showForm('register')"><span data-i18n="auth.login.register">Sign Up</span></a>
                 </div>
             </div>
 
             <!-- Register Form -->
             <div class="auth-form-wrap" id="registerForm">
-                <h2>创建账户</h2>
-                <p class="auth-subtitle">注册开始管理您的时间</p>
+                <h2 data-i18n="auth.register.title">Create Account</h2>
+                <p class="auth-subtitle" data-i18n="auth.register.subtitle">Register to start managing your time</p>
                 <form onsubmit="return handleRegister(event)">
                     <div class="auth-field">
-                        <label for="regEmail">邮箱</label>
+                        <label for="regEmail" data-i18n="auth.email">Email</label>
                         <input type="email" id="regEmail" placeholder="your@email.com" required autocomplete="email">
                     </div>
                     <div class="auth-field">
-                        <label for="regUsername">用户名</label>
-                        <input type="text" id="regUsername" placeholder="2-30 个字符" required minlength="2" maxlength="30" autocomplete="username">
+                        <label for="regUsername" data-i18n="auth.username">Username</label>
+                        <input type="text" id="regUsername" data-i18n-placeholder="auth.username.placeholder" placeholder="2-30 characters" required minlength="2" maxlength="30" autocomplete="username">
                     </div>
                     <div class="auth-field">
-                        <label for="regPassword">密码</label>
-                        <input type="password" id="regPassword" placeholder="至少 8 位，包含字母和数字" required minlength="8" autocomplete="new-password">
+                        <label for="regPassword" data-i18n="auth.password">Password</label>
+                        <input type="password" id="regPassword" data-i18n-placeholder="auth.password.requirement" placeholder="At least 8 characters, with letters and numbers" required minlength="8" autocomplete="new-password">
                     </div>
                     <div class="auth-field">
-                        <label for="regConfirm">确认密码</label>
-                        <input type="password" id="regConfirm" placeholder="再次输入密码" required autocomplete="new-password">
+                        <label for="regConfirm" data-i18n="auth.confirmPassword">Confirm Password</label>
+                        <input type="password" id="regConfirm" data-i18n-placeholder="auth.confirmPassword.placeholder" placeholder="Enter password again" required autocomplete="new-password">
                     </div>
                     <div class="auth-error" id="registerError"></div>
-                    <button type="submit" class="auth-btn" id="registerBtn">注册</button>
+                    <button type="submit" class="auth-btn" id="registerBtn" data-i18n="auth.register.btn">Sign Up</button>
                 </form>
                 <div class="auth-switch">
-                    已有账户？<a href="#" onclick="showForm('login')">返回登录</a>
+                    <span data-i18n="auth.register.hasAccount">Already have an account?</span> <a href="#" onclick="showForm('login')"><span data-i18n="auth.register.login">Sign In</span></a>
                 </div>
             </div>
 
             <!-- Forgot Password Form -->
             <div class="auth-form-wrap" id="forgotForm">
-                <h2>重置密码</h2>
-                <p class="auth-subtitle" id="forgotSubtitle">输入您的注册邮箱，我们将发送验证码</p>
+                <h2 data-i18n="auth.reset.title">Reset Password</h2>
+                <p class="auth-subtitle" id="forgotSubtitle" data-i18n="auth.reset.subtitle">Enter your registered email, we'll send a verification code</p>
 
                 <!-- Step 1: Enter email -->
                 <div id="forgotStep1">
                     <form onsubmit="return handleForgot(event)">
                         <div class="auth-field">
-                            <label for="forgotEmail">邮箱</label>
+                            <label for="forgotEmail" data-i18n="auth.email">Email</label>
                             <input type="email" id="forgotEmail" placeholder="your@email.com" required autocomplete="email">
                         </div>
                         <div class="auth-error" id="forgotError"></div>
-                        <button type="submit" class="auth-btn" id="forgotBtn">发送验证码</button>
+                        <button type="submit" class="auth-btn" id="forgotBtn" data-i18n="auth.sendCode">Send Code</button>
                     </form>
                 </div>
 
@@ -118,11 +123,11 @@
                 <div id="forgotStep2" style="display:none">
                     <form onsubmit="return handleVerifyCode(event)">
                         <div class="auth-field">
-                            <label for="verifyCode">验证码</label>
-                            <input type="text" id="verifyCode" placeholder="输入 6 位验证码" required maxlength="6" pattern="\d{6}" autocomplete="one-time-code" inputmode="numeric">
+                            <label for="verifyCode" data-i18n="auth.verifyCode">Verification Code</label>
+                            <input type="text" id="verifyCode" data-i18n-placeholder="auth.verifyCode.placeholder" placeholder="Enter 6-digit code" required maxlength="6" pattern="\d{6}" autocomplete="one-time-code" inputmode="numeric">
                         </div>
                         <div class="auth-error" id="verifyError"></div>
-                        <button type="submit" class="auth-btn" id="verifyBtn">验证</button>
+                        <button type="submit" class="auth-btn" id="verifyBtn" data-i18n="auth.verify">Verify</button>
                     </form>
                 </div>
 
@@ -130,20 +135,20 @@
                 <div id="forgotStep3" style="display:none">
                     <form onsubmit="return handleResetPassword(event)">
                         <div class="auth-field">
-                            <label for="newPassword">新密码</label>
-                            <input type="password" id="newPassword" placeholder="至少 8 位，包含字母和数字" required minlength="8" autocomplete="new-password">
+                            <label for="newPassword" data-i18n="auth.newPassword">New Password</label>
+                            <input type="password" id="newPassword" data-i18n-placeholder="auth.password.requirement" placeholder="At least 8 characters, with letters and numbers" required minlength="8" autocomplete="new-password">
                         </div>
                         <div class="auth-field">
-                            <label for="newConfirm">确认新密码</label>
-                            <input type="password" id="newConfirm" placeholder="再次输入新密码" required autocomplete="new-password">
+                            <label for="newConfirm" data-i18n="auth.confirmNewPassword">Confirm New Password</label>
+                            <input type="password" id="newConfirm" data-i18n-placeholder="auth.confirmNew.placeholder" placeholder="Enter new password again" required autocomplete="new-password">
                         </div>
                         <div class="auth-error" id="resetError"></div>
-                        <button type="submit" class="auth-btn" id="resetBtn">重置密码</button>
+                        <button type="submit" class="auth-btn" id="resetBtn" data-i18n="auth.resetPassword">Reset Password</button>
                     </form>
                 </div>
 
                 <div class="auth-switch">
-                    <a href="#" onclick="showForm('login')">← 返回登录</a>
+                    <a href="#" onclick="showForm('login')" data-i18n="auth.backToLogin">← Back to Sign In</a>
                 </div>
             </div>
         </div>
@@ -154,6 +159,30 @@
             if (t) document.documentElement.setAttribute('data-theme', t);
             else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
         })();
+    </script>
+    <script src="/static/js/i18n.js"></script>
+    <script>
+        (function() {
+            var sel = document.getElementById('langSelect');
+            if (sel && window.I18n && I18n.LANGUAGES) {
+                I18n.LANGUAGES.forEach(function(lang) {
+                    var opt = document.createElement('option');
+                    opt.value = lang.code;
+                    opt.textContent = lang.name;
+                    sel.appendChild(opt);
+                });
+                var current = I18n.getLanguage();
+                sel.value = current || 'en';
+                I18n.setLanguage(sel.value);
+            }
+            if (window.I18n) I18n.applyTranslations();
+        })();
+        function changeAuthLanguage(code) {
+            if (window.I18n) {
+                I18n.setLanguage(code);
+                document.title = I18n.t('app.title.login');
+            }
+        }
     </script>
     <script src="/static/js/auth.js"></script>
 </body>

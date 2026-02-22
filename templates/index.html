@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日程规划器</title>
+    <title>Schedule Planner</title>
     <script>
         (function() {
             var t = localStorage.getItem('theme');
@@ -29,21 +29,21 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="/static/js/i18n.js"></script>
 </head>
 <body>
     <div id="app">
         <nav class="top-bar">
-            <h1 class="logo">📅 日程规划器</h1>
+            <h1 class="logo">📅 <span data-i18n="app.title">Schedule Planner</span></h1>
             <div class="tab-nav">
-                <button class="tab active" data-page="schedule">📋 日程安排表</button>
+                <button class="tab active" data-page="schedule">📋 <span data-i18n="nav.schedule">Schedule</span></button>
                 <button class="tab" data-page="timer">
-                    ⏱️ 计时器
-                    <span class="timer-badge" id="timerBadge"></span>
+                    ⏱️ <span data-i18n="nav.timer">Timer</span><span class="timer-badge" id="timerBadge"></span>
                 </button>
-                <button class="tab" data-page="stats">📊 数据统计</button>
+                <button class="tab" data-page="stats">📊 <span data-i18n="nav.stats">Statistics</span></button>
             </div>
             <div class="top-bar-spacer"></div>
-            <button class="theme-toggle" id="themeToggle" title="切换主题">
+            <button class="theme-toggle" id="themeToggle" data-i18n-title="nav.toggleTheme" title="Toggle theme">
                 <span class="theme-icon" id="themeIcon">🌙</span>
             </button>
             <div class="user-menu" id="userMenu">
@@ -52,7 +52,7 @@
                         <span id="userAvatarInitial">U</span>
                         <img id="userAvatarImg" style="display:none" alt="">
                     </div>
-                    <span class="user-name-text" id="userNameText">用户</span>
+                    <span class="user-name-text" id="userNameText" data-i18n="user.default">User</span>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
                 </button>
                 <div class="user-dropdown" id="userDropdown">
@@ -62,38 +62,38 @@
                             <img id="dropdownAvatarImg" style="display:none" alt="">
                         </div>
                         <div>
-                            <div class="dropdown-username" id="dropdownUsername">用户</div>
+                            <div class="dropdown-username" id="dropdownUsername">User</div>
                             <div class="dropdown-email" id="dropdownEmail">user@email.com</div>
                         </div>
                     </div>
                     <div class="user-dropdown-divider"></div>
                     <button class="dropdown-item" onclick="openProfile()">
-                        <span class="dropdown-icon">👤</span>个人资料
+                        <span class="dropdown-icon">👤</span><span data-i18n="user.profile">Profile</span>
                     </button>
                     <button class="dropdown-item" onclick="exportData()">
-                        <span class="dropdown-icon">📥</span>导出数据 (JSON)
+                        <span class="dropdown-icon">📥</span><span data-i18n="user.exportJSON">Export Data (JSON)</span>
                     </button>
                     <button class="dropdown-item" onclick="exportCSV()">
-                        <span class="dropdown-icon">📊</span>导出数据 (CSV)
+                        <span class="dropdown-icon">📊</span><span data-i18n="user.exportCSV">Export Data (CSV)</span>
                     </button>
                     <button class="dropdown-item" onclick="exportICal()">
-                        <span class="dropdown-icon">📅</span>导出日历 (iCal)
+                        <span class="dropdown-icon">📅</span><span data-i18n="user.exportICal">Export Calendar (iCal)</span>
                     </button>
                     <button class="dropdown-item" onclick="importData()">
-                        <span class="dropdown-icon">📤</span>导入数据
+                        <span class="dropdown-icon">📤</span><span data-i18n="user.importData">Import Data</span>
                     </button>
                     <button class="dropdown-item" onclick="document.getElementById('shortcutsModal').classList.add('active');document.getElementById('userDropdown').classList.remove('active');">
-                        <span class="dropdown-icon">⌨️</span>快捷键
+                        <span class="dropdown-icon">⌨️</span><span data-i18n="user.shortcuts">Keyboard Shortcuts</span>
                     </button>
                     <div class="user-dropdown-divider"></div>
                     <button class="dropdown-item dropdown-item-danger" onclick="handleLogout()">
-                        <span class="dropdown-icon">🚪</span>退出登录
+                        <span class="dropdown-icon">🚪</span><span data-i18n="user.logout">Sign Out</span>
                     </button>
                 </div>
             </div>
         </nav>
 
-        <div class="offline-banner" id="offlineBanner">🔌 网络已断开，部分功能可能不可用</div>
+        <div class="offline-banner" id="offlineBanner" data-i18n="user.offline">🔌 Network disconnected...</div>
 
         {% include 'partials/schedule.html' %}
         {% include 'partials/timer.html' %}
@@ -106,67 +106,66 @@
     <div class="drawer-overlay" id="profileOverlay">
         <div class="drawer" id="profileDrawer">
             <div class="drawer-header">
-                <h3>个人资料</h3>
+                <h3 data-i18n="profile.title">Profile</h3>
                 <button class="drawer-close" onclick="closeProfile()">&times;</button>
             </div>
             <div class="drawer-body">
-                <!-- Avatar Section -->
                 <div class="profile-avatar-section">
                     <div class="profile-avatar" id="profileAvatar">
                         <span id="profileAvatarInitial">U</span>
                         <img id="profileAvatarImg" style="display:none" alt="">
                         <label class="avatar-upload-overlay" for="avatarInput">
-                            <span>更换头像</span>
+                            <span data-i18n="profile.changeAvatar">Change Avatar</span>
                         </label>
                     </div>
                     <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="handleAvatarUpload(this)">
                 </div>
-
-                <!-- Profile Info -->
                 <div class="profile-section">
-                    <h4>基本信息</h4>
+                    <h4 data-i18n="profile.basicInfo">Basic Information</h4>
                     <div class="profile-field">
-                        <label>用户名</label>
-                        <input type="text" id="profileUsername" placeholder="输入用户名" maxlength="30">
+                        <label data-i18n="profile.username">Username</label>
+                        <input type="text" id="profileUsername" data-i18n-placeholder="profile.username.placeholder" placeholder="Enter username" maxlength="30">
                     </div>
                     <div class="profile-field">
-                        <label>个人简介</label>
-                        <textarea id="profileBio" placeholder="介绍一下自己..." maxlength="200" rows="3"></textarea>
+                        <label data-i18n="profile.bio">Bio</label>
+                        <textarea id="profileBio" data-i18n-placeholder="profile.bio.placeholder" placeholder="Tell us about yourself..." maxlength="200" rows="3"></textarea>
                     </div>
                     <div class="profile-field">
-                        <label>邮箱</label>
+                        <label data-i18n="profile.email">Email</label>
                         <input type="email" id="profileEmail" disabled>
                     </div>
                     <div class="profile-field">
-                        <label>注册时间</label>
+                        <label data-i18n="profile.createdAt">Registered</label>
                         <input type="text" id="profileCreatedAt" disabled>
                     </div>
-                    <button class="profile-save-btn" onclick="saveProfile()">保存修改</button>
+                    <button class="profile-save-btn" onclick="saveProfile()" data-i18n="profile.save">Save</button>
                 </div>
-
-                <!-- Change Password -->
                 <div class="profile-section">
-                    <h4>修改密码</h4>
+                    <h4 data-i18n="profile.changePassword">Change Password</h4>
                     <div class="profile-field">
-                        <label>原密码</label>
-                        <input type="password" id="pwdOld" placeholder="输入原密码" autocomplete="current-password">
+                        <label data-i18n="profile.oldPassword">Old Password</label>
+                        <input type="password" id="pwdOld" data-i18n-placeholder="profile.oldPassword.placeholder" placeholder="Enter current password" autocomplete="current-password">
                     </div>
                     <div class="profile-field">
-                        <label>新密码</label>
-                        <input type="password" id="pwdNew" placeholder="至少 8 位，包含字母和数字" autocomplete="new-password">
+                        <label data-i18n="profile.newPassword">New Password</label>
+                        <input type="password" id="pwdNew" data-i18n-placeholder="profile.newPassword.placeholder" placeholder="At least 8 characters, letters and numbers" autocomplete="new-password">
                     </div>
                     <div class="profile-field">
-                        <label>确认新密码</label>
-                        <input type="password" id="pwdConfirm" placeholder="再次输入新密码" autocomplete="new-password">
+                        <label data-i18n="profile.confirmPassword">Confirm Password</label>
+                        <input type="password" id="pwdConfirm" data-i18n-placeholder="profile.confirmPassword.placeholder" placeholder="Re-enter new password" autocomplete="new-password">
                     </div>
-                    <button class="profile-save-btn" onclick="changePassword()">修改密码</button>
+                    <button class="profile-save-btn" onclick="changePassword()" data-i18n="profile.changePasswordBtn">Change Password</button>
                 </div>
-
-                <!-- Danger Zone -->
+                <div class="profile-section">
+                    <h4 data-i18n="profile.language">Language</h4>
+                    <div class="profile-field">
+                        <select id="profileLanguage" class="profile-lang-select"></select>
+                    </div>
+                </div>
                 <div class="profile-section danger-zone">
-                    <h4>危险操作</h4>
-                    <p class="danger-text">删除账户后，所有数据将被永久删除且不可恢复。</p>
-                    <button class="profile-danger-btn" onclick="deleteAccount()">删除账户</button>
+                    <h4 data-i18n="profile.dangerZone">Danger Zone</h4>
+                    <p class="danger-text" data-i18n="profile.dangerText">Deleting your account will permanently remove all data and cannot be undone.</p>
+                    <button class="profile-danger-btn" onclick="deleteAccount()" data-i18n="profile.deleteAccount">Delete Account</button>
                 </div>
             </div>
         </div>

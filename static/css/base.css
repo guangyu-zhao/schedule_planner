@@ -87,3 +87,20 @@ body {
     flex-direction: column;
     height: 100vh;
 }
+
+/* ===== RTL Support ===== */
+[dir="rtl"] { direction: rtl; text-align: right; }
+[dir="rtl"] .tab-nav { margin-left: 0; margin-right: 24px; }
+[dir="rtl"] .timer-badge { right: auto; left: 4px; }
+[dir="rtl"] .user-dropdown { right: auto; left: 0; }
+[dir="rtl"] .schedule-page-inner { direction: rtl; }
+[dir="rtl"] .notes-editor { text-align: right; }
+[dir="rtl"] .drawer { right: auto; left: 0; transform: translateX(-100%); }
+[dir="rtl"] .drawer.active { transform: translateX(0); }
+[dir="rtl"] .drawer-close { right: auto; left: 16px; }
+[dir="rtl"] .popover { text-align: right; }
+[dir="rtl"] .modal-footer { flex-direction: row-reverse; }
+[dir="rtl"] .modal-footer-right { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .auth-lang-select { right: auto; left: 24px; }
+[dir="rtl"] .auth-options { flex-direction: row-reverse; }
+[dir="rtl"] .profile-lang-select { text-align: right; }

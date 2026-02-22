@@ -132,6 +132,32 @@ body {
     padding: 40px;
     background: var(--bg-primary);
     overflow-y: auto;
+    position: relative;
+}
+
+.auth-lang-select {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+}
+
+.auth-lang-select select {
+    padding: 6px 28px 6px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23636e72' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+.auth-lang-select select:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 .auth-form-wrap {

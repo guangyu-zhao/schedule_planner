@@ -1,4 +1,4 @@
-import { CATEGORY_ICONS, CATEGORY_COLORS, DAY_NAMES } from './constants.js';
+import { CATEGORY_ICONS, CATEGORY_COLORS, getCategoryLabel } from './constants.js';
 import { fmtDateISO } from './helpers.js';
 
 export class StatisticsManager {
@@ -13,6 +13,8 @@ export class StatisticsManager {
 
     init() { this.bindEvents(); this.renderCalendar(); this.updateRangeLabel(); }
     onTabActive() { this.loadData(); this.loaded = true; }
+
+    t(k, p) { return (window.I18n && window.I18n.t) ? window.I18n.t(k, p) : k; }
 
     getDateRange() {
         const d = new Date(this.selectedDate);
@@ -31,17 +33,17 @@ export class StatisticsManager {
         return { start: '2020-01-01', end: fmtDateISO(new Date()) };
     }
 
-    fmtDateCN(dateStr) {
-        const d = new Date(dateStr + 'T00:00:00');
-        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${DAY_NAMES[d.getDay()]}`;
-    }
-
     updateRangeLabel() {
         const { start, end } = this.getDateRange();
         const el = document.getElementById('selectedRange');
-        if (this.period === 'day') el.textContent = this.fmtDateCN(start);
-        else if (this.period === 'all') el.textContent = '全部历史数据';
-        else el.textContent = `${start} ~ ${end}`;
+        if (this.period === 'day') {
+            const d = new Date(start + 'T00:00:00');
+            el.textContent = (window.I18n && window.I18n.formatDate) ? window.I18n.formatDate(d) : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        } else if (this.period === 'all') {
+            el.textContent = this.t('stats.allHistory');
+        } else {
+            el.textContent = `${start} ~ ${end}`;
+        }
     }
 
     renderCalendar() {
@@ -52,8 +54,15 @@ export class StatisticsManager {
         startDate.setDate(firstDay.getDate() - (dow === 0 ? 6 : dow - 1));
         const { start: rangeStart, end: rangeEnd } = this.getDateRange();
 
-        let html = `<div class="cal-nav"><button id="calPrev">‹</button><span>${year}年${month + 1}月</span><button id="calNext">›</button></div>`;
-        html += '<div class="cal-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>';
+        const weekdays = (window.I18n && window.I18n.t) ? window.I18n.t('cal.weekdays') : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysArr = Array.isArray(weekdays) ? weekdays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysHtml = weekdaysArr.map(w => `<span>${w}</span>`).join('');
+
+        const monthLabel = (window.I18n && window.I18n.formatMonth) ? window.I18n.formatMonth(year, month) : `${year}年${month + 1}月`;
+        const todayBtn = this.t('cal.today');
+
+        let html = `<div class="cal-nav"><button id="calPrev">‹</button><span>${monthLabel}</span><button id="calNext">›</button></div>`;
+        html += `<div class="cal-weekdays">${weekdaysHtml}</div>`;
         html += '<div class="cal-grid">';
         for (let i = 0; i < 42; i++) {
             const day = new Date(startDate); day.setDate(startDate.getDate() + i);
@@ -74,7 +83,7 @@ export class StatisticsManager {
             html += `<div class="${cls}" data-date="${ds}">${day.getDate()}</div>`;
         }
         html += '</div>';
-        html += '<button class="today-btn">回到今天</button>';
+        html += `<button class="today-btn">${todayBtn}</button>`;
         document.getElementById('miniCalendar').innerHTML = html;
 
         document.getElementById('calPrev').addEventListener('click', () => { this.calendarMonth.setMonth(this.calendarMonth.getMonth() - 1); this.renderCalendar(); });
@@ -166,7 +175,14 @@ export class StatisticsManager {
         return [...months].sort();
     }
 
-    fmtLabel(key) { return key.length === 7 ? key.substring(5) + '月' : key.substring(5); }
+    fmtLabel(key) {
+        if (key.length === 7) {
+            const monthNum = key.substring(5);
+            const monthSuffix = (window.I18n && window.I18n.t) ? window.I18n.t('stats.monthSuffix') : '月';
+            return monthNum + monthSuffix;
+        }
+        return key.substring(5);
+    }
 
     chartScheduleTrend(labels, events, groupFn) {
         const hours = {};
@@ -179,11 +195,12 @@ export class StatisticsManager {
                 hours[k] += ((eh * 60 + em) - (sh * 60 + sm)) / 60;
             }
         });
+        const durationLabel = this.t('stats.durationLabel');
         return new Chart(document.getElementById('chartSchedule'), {
             type: 'bar', data: {
                 labels: labels.map(l => this.fmtLabel(l)),
                 datasets: [
-                    { label: '执行时长(h)', data: labels.map(l => Math.round(hours[l] * 10) / 10), backgroundColor: '#6c5ce7', borderRadius: 4 },
+                    { label: durationLabel, data: labels.map(l => Math.round(hours[l] * 10) / 10), backgroundColor: '#6c5ce7', borderRadius: 4 },
                 ]
             }, options: {
                 responsive: true, maintainAspectRatio: false,
@@ -202,12 +219,13 @@ export class StatisticsManager {
         });
         const keys = Object.keys(cats);
         const ctx = document.getElementById('chartCategory');
+        const noData = this.t('stats.noData');
         if (keys.length === 0) {
-            return new Chart(ctx, { type: 'doughnut', data: { labels: ['暂无数据'], datasets: [{ data: [1], backgroundColor: ['#dfe6e9'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } } });
+            return new Chart(ctx, { type: 'doughnut', data: { labels: [noData], datasets: [{ data: [1], backgroundColor: ['#dfe6e9'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } } });
         }
         return new Chart(ctx, {
             type: 'doughnut', data: {
-                labels: keys.map(k => `${CATEGORY_ICONS[k] || ''} ${k}`),
+                labels: keys.map(k => `${CATEGORY_ICONS[k] || ''} ${getCategoryLabel(k)}`),
                 datasets: [{ data: keys.map(k => Math.round(cats[k] * 10) / 10), backgroundColor: keys.map(k => CATEGORY_COLORS[k] || '#b2bec3') }]
             }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
         });
@@ -217,10 +235,11 @@ export class StatisticsManager {
         const mins = {};
         labels.forEach(l => mins[l] = 0);
         timer.forEach(r => { const k = groupFn(r.date); if (k in mins) mins[k] += Math.round(r.actual_seconds / 60); });
+        const focusLabel = this.t('stats.focusLabel');
         return new Chart(document.getElementById('chartFocus'), {
             type: 'bar', data: {
                 labels: labels.map(l => this.fmtLabel(l)),
-                datasets: [{ label: '专注(分钟)', data: labels.map(l => mins[l]), backgroundColor: '#6c5ce7', borderRadius: 4 }]
+                datasets: [{ label: focusLabel, data: labels.map(l => mins[l]), backgroundColor: '#6c5ce7', borderRadius: 4 }]
             }, options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
@@ -234,12 +253,16 @@ export class StatisticsManager {
         events.forEach(e => counts[e.priority] = (counts[e.priority] || 0) + 1);
         const ctx = document.getElementById('chartPriority');
         const total = counts[1] + counts[2] + counts[3];
+        const noData = this.t('stats.noData');
         if (total === 0) {
-            return new Chart(ctx, { type: 'doughnut', data: { labels: ['暂无数据'], datasets: [{ data: [1], backgroundColor: ['#dfe6e9'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } } });
+            return new Chart(ctx, { type: 'doughnut', data: { labels: [noData], datasets: [{ data: [1], backgroundColor: ['#dfe6e9'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } } });
         }
+        const highLabel = this.t('stats.priorityHigh');
+        const medLabel = this.t('stats.priorityMed');
+        const lowLabel = this.t('stats.priorityLow');
         return new Chart(ctx, {
             type: 'doughnut', data: {
-                labels: ['🔴 高', '🟡 中', '🟢 低'],
+                labels: [highLabel, medLabel, lowLabel],
                 datasets: [{ data: [counts[1], counts[2], counts[3]], backgroundColor: ['#e74c3c', '#fdcb6e', '#00b894'] }]
             }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
         });

@@ -59,11 +59,21 @@ def update_profile():
     if len(bio) > 200:
         return jsonify({"error": "个人简介不能超过 200 个字符"}), 400
 
+    language = data.get("language")
+    if language and language not in ("en", "zh-CN", "zh-TW", "fr", "de", "ja", "ar", "he"):
+        language = None
+
     conn = get_db()
-    conn.execute(
-        "UPDATE users SET username=?, bio=?, updated_at=datetime('now','localtime') WHERE id=?",
-        (username, bio, g.user_id),
-    )
+    if language:
+        conn.execute(
+            "UPDATE users SET username=?, bio=?, language=?, updated_at=datetime('now','localtime') WHERE id=?",
+            (username, bio, language, g.user_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE users SET username=?, bio=?, updated_at=datetime('now','localtime') WHERE id=?",
+            (username, bio, g.user_id),
+        )
     conn.commit()
     user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
     u = dict(user)

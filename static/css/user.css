@@ -313,7 +313,8 @@
 }
 
 .profile-field input,
-.profile-field textarea {
+.profile-field textarea,
+.profile-field select {
     width: 100%;
     padding: 9px 12px;
     border: 1.5px solid var(--border-color);
@@ -327,7 +328,8 @@
 }
 
 .profile-field input:focus,
-.profile-field textarea:focus {
+.profile-field textarea:focus,
+.profile-field select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(108,92,231,0.1);

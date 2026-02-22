@@ -1,4 +1,4 @@
-import { RING_CIRCUMFERENCE, DAY_NAMES } from './constants.js';
+import { RING_CIRCUMFERENCE } from './constants.js';
 import { fmtDateISO, escHtml, showToast } from './helpers.js';
 
 export class TimerManager {
@@ -39,6 +39,8 @@ export class TimerManager {
 
     selectedDateStr() { return fmtDateISO(this.selectedDate); }
 
+    t(k, p) { return (window.I18n && window.I18n.t) ? window.I18n.t(k, p) : k; }
+
     /* ---- Calendar ---- */
     renderCalendar() {
         const year = this.calendarMonth.getFullYear(), month = this.calendarMonth.getMonth();
@@ -50,8 +52,15 @@ export class TimerManager {
         const sel = this.selectedDateStr();
         const todayStr = fmtDateISO(new Date());
 
-        let html = `<div class="cal-nav"><button class="tcal-prev">‹</button><span>${year}年${month + 1}月</span><button class="tcal-next">›</button></div>`;
-        html += '<div class="cal-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>';
+        const weekdays = (window.I18n && window.I18n.t) ? window.I18n.t('cal.weekdays') : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysArr = Array.isArray(weekdays) ? weekdays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysHtml = weekdaysArr.map(w => `<span>${w}</span>`).join('');
+
+        const monthLabel = (window.I18n && window.I18n.formatMonth) ? window.I18n.formatMonth(year, month) : `${year}年${month + 1}月`;
+        const todayBtn = this.t('cal.today');
+
+        let html = `<div class="cal-nav"><button class="tcal-prev">‹</button><span>${monthLabel}</span><button class="tcal-next">›</button></div>`;
+        html += `<div class="cal-weekdays">${weekdaysHtml}</div>`;
         html += '<div class="cal-grid">';
         for (let i = 0; i < 42; i++) {
             const day = new Date(startDate);
@@ -64,7 +73,7 @@ export class TimerManager {
             html += `<div class="${cls}" data-date="${ds}">${day.getDate()}</div>`;
         }
         html += '</div>';
-        html += '<button class="today-btn">回到今天</button>';
+        html += `<button class="today-btn">${todayBtn}</button>`;
 
         const container = document.getElementById('timerCal');
         container.innerHTML = html;
@@ -94,8 +103,8 @@ export class TimerManager {
 
     updateDateLabel() {
         const d = this.selectedDate;
-        document.getElementById('timerDateLabel').textContent =
-            `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${DAY_NAMES[d.getDay()]}`;
+        const label = (window.I18n && window.I18n.formatDate) ? window.I18n.formatDate(d) : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        document.getElementById('timerDateLabel').textContent = label;
     }
 
     onDateChange() {
@@ -138,7 +147,7 @@ export class TimerManager {
         this.remainingSeconds += minutes * 60;
         this.plannedMinutes += minutes;
         this.updateDisplay();
-        showToast(`已增加 ${minutes} 分钟`);
+        showToast(this.t('timer.addedMinutes', { min: minutes }));
     }
 
     start() {
@@ -164,15 +173,15 @@ export class TimerManager {
             this.state = 'paused';
             clearInterval(this.intervalId);
             this.intervalId = null;
-            document.getElementById('timerPauseBtn').textContent = '▶ 继续';
+            document.getElementById('timerPauseBtn').textContent = this.t('timer.resume');
             document.getElementById('timerDisplay').classList.add('paused');
-            document.getElementById('timerStateLabel').textContent = '已暂停';
+            document.getElementById('timerStateLabel').textContent = this.t('timer.paused');
         } else if (this.state === 'paused') {
             this.state = 'running';
             this.intervalId = setInterval(() => this.tick(), 1000);
-            document.getElementById('timerPauseBtn').textContent = '⏸ 暂停';
+            document.getElementById('timerPauseBtn').textContent = this.t('timer.pause');
             document.getElementById('timerDisplay').classList.remove('paused');
-            document.getElementById('timerStateLabel').textContent = '专注中...';
+            document.getElementById('timerStateLabel').textContent = this.t('timer.focusing');
         }
     }
 
@@ -209,8 +218,8 @@ export class TimerManager {
     async complete() {
         if (this.isBreak) {
             this.playSound();
-            showToast('休息结束，准备开始下一轮专注！');
-            document.getElementById('timerStateLabel').textContent = '休息结束';
+            showToast(this.t('timer.breakReady'));
+            document.getElementById('timerStateLabel').textContent = this.t('timer.breakDone');
             this.isBreak = false;
             document.querySelector('.timer-ring-wrap').classList.remove('break-mode');
             setTimeout(() => {
@@ -231,8 +240,8 @@ export class TimerManager {
         this.showNotification();
         await this.saveRecord(true);
         this.pomodoroCount++;
-        showToast(`专注完成！(第 ${this.pomodoroCount} 个番茄钟)`);
-        document.getElementById('timerStateLabel').textContent = '完成！';
+        showToast(this.t('timer.focusComplete', { count: this.pomodoroCount }));
+        document.getElementById('timerStateLabel').textContent = this.t('timer.done');
         document.querySelector('.timer-ring-wrap').classList.add('completed');
 
         const shouldAutoBreak = this.autoBreak;
@@ -262,13 +271,13 @@ export class TimerManager {
         this.totalSeconds = breakMin * 60;
         this.remainingSeconds = breakMin * 60;
         this.elapsedSeconds = 0;
-        document.getElementById('timerStateLabel').textContent = isLong ? '长休息中...' : '短休息中...';
+        document.getElementById('timerStateLabel').textContent = isLong ? this.t('timer.longBreak') : this.t('timer.shortBreak');
         document.querySelector('.timer-ring-wrap').classList.add('break-mode');
         this.updateControlsVisibility();
         this.updateDisplay();
         this.updateBadge(true);
         this.intervalId = setInterval(() => this.tick(), 1000);
-        showToast(isLong ? `长休息 ${breakMin} 分钟` : `短休息 ${breakMin} 分钟`);
+        showToast(isLong ? this.t('timer.longBreakStart', { min: breakMin }) : this.t('timer.shortBreakStart', { min: breakMin }));
     }
 
     updatePomodoroIndicator() {
@@ -279,7 +288,7 @@ export class TimerManager {
         for (let i = 0; i < this.pomodorosUntilLong; i++) {
             html += `<span class="pomo-dot${i < inCycle ? ' filled' : ''}"></span>`;
         }
-        html += `<span class="pomo-count">${this.pomodoroCount} 个番茄钟</span>`;
+        html += `<span class="pomo-count">${this.t('timer.pomodoroCount', { count: this.pomodoroCount })}</span>`;
         el.innerHTML = html;
     }
 
@@ -293,12 +302,14 @@ export class TimerManager {
         if (ring) ring.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
         if (this.state === 'running') {
             if (!this.isBreak) {
-                document.getElementById('timerStateLabel').textContent = '专注中...';
+                document.getElementById('timerStateLabel').textContent = this.t('timer.focusing');
             }
-            const label = this.isBreak ? '休息中' : (document.getElementById('timerTaskName').value || '计时中');
-            document.title = `${ts} - ${label} | 日程规划器`;
+            const taskName = document.getElementById('timerTaskName').value;
+            const label = this.isBreak ? this.t('timer.resting') : (taskName || this.t('timer.timing'));
+            const appTitle = (window.I18n && window.I18n.t) ? window.I18n.t('app.title') : 'Schedule Planner';
+            document.title = `${ts} - ${label} | ${appTitle}`;
         } else if (this.state === 'idle') {
-            document.getElementById('timerStateLabel').textContent = '准备开始';
+            document.getElementById('timerStateLabel').textContent = this.t('timer.ready');
         }
     }
 
@@ -309,7 +320,7 @@ export class TimerManager {
         const input = document.getElementById('timerTaskName');
         if (idle) { input.classList.remove('running'); input.removeAttribute('readonly'); }
         else { input.classList.add('running'); input.setAttribute('readonly', true); }
-        document.getElementById('timerPauseBtn').textContent = '⏸ 暂停';
+        document.getElementById('timerPauseBtn').textContent = this.t('timer.pause');
     }
 
     updateBadge(active) { document.getElementById('timerBadge').classList.toggle('active', active); }
@@ -328,7 +339,16 @@ export class TimerManager {
     }
 
     requestNotificationPermission() { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); }
-    showNotification() { if ('Notification' in window && Notification.permission === 'granted') new Notification('专注完成！', { body: `"${document.getElementById('timerTaskName').value}" - ${this.plannedMinutes}分钟` }); }
+
+    showNotification() {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const name = document.getElementById('timerTaskName').value;
+            const notifTitle = this.t('timer.focusCompleteNotif');
+            const notifBody = this.t('timer.focusCompleteBody', { name, min: this.plannedMinutes });
+            new Notification(notifTitle, { body: notifBody });
+        }
+    }
+
     todayStr() { return fmtDateISO(new Date()); }
 
     async saveRecord(completed) {
@@ -344,18 +364,27 @@ export class TimerManager {
                     completed: completed ? 1 : 0,
                 }),
             });
-            if (!r.ok) { showToast('保存记录失败', { type: 'error' }); return; }
+            if (!r.ok) {
+                showToast(this.t('timer.saveFailed'), { type: 'error' });
+                return;
+            }
             if (this.selectedDateStr() === this.todayStr()) {
                 this.fetchRecords();
                 this.fetchStats();
             }
-        } catch (e) { console.error(e); showToast('网络错误，记录保存失败', { type: 'error' }); }
+        } catch (e) {
+            console.error(e);
+            showToast(this.t('timer.saveNetworkError'), { type: 'error' });
+        }
     }
 
     async fetchRecords() {
         try {
             const r = await fetch(`/api/timer/records?date=${this.selectedDateStr()}`);
-            if (!r.ok) { showToast('加载记录失败', { type: 'error' }); return; }
+            if (!r.ok) {
+                showToast(this.t('timer.loadFailed'), { type: 'error' });
+                return;
+            }
             const data = await r.json();
             this.renderRecords(Array.isArray(data) ? data : []);
         } catch (e) { console.error(e); }
@@ -367,7 +396,8 @@ export class TimerManager {
             if (!r.ok) return;
             const s = await r.json();
             const m = Math.round((s.total_seconds || 0) / 60);
-            document.getElementById('tsFocusTime').textContent = m >= 60 ? `${Math.floor(m / 60)}h${m % 60 > 0 ? m % 60 + 'm' : ''}` : `${m}分钟`;
+            const minsText = (window.I18n && window.I18n.t) ? window.I18n.t('timer.minutes', { m }) : `${m}min`;
+            document.getElementById('tsFocusTime').textContent = m >= 60 ? `${Math.floor(m / 60)}h${m % 60 > 0 ? m % 60 + 'm' : ''}` : minsText;
             document.getElementById('tsTaskCount').textContent = s.total || 0;
             document.getElementById('tsCompleted').textContent = s.completed || 0;
         } catch (e) { console.error(e); }
@@ -376,19 +406,31 @@ export class TimerManager {
     async deleteRecord(id) {
         try {
             const r = await fetch(`/api/timer/records/${id}`, { method: 'DELETE' });
-            if (!r.ok) { showToast('删除记录失败', { type: 'error' }); return; }
+            if (!r.ok) {
+                showToast(this.t('timer.deleteFailed'), { type: 'error' });
+                return;
+            }
             this.fetchRecords();
             this.fetchStats();
-        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); }
+        } catch (e) {
+            console.error(e);
+            showToast(this.t('toast.networkError'), { type: 'error' });
+        }
     }
 
     renderRecords(records) {
         const list = document.getElementById('timerRecordsList');
-        if (!records.length) { list.innerHTML = '<div class="timer-records-empty">暂无记录</div>'; return; }
+        if (!records.length) {
+            list.innerHTML = `<div class="timer-records-empty">${this.t('timer.noRecords')}</div>`;
+            return;
+        }
         list.innerHTML = records.map(r => {
             const m = Math.round(r.actual_seconds / 60);
             const time = r.created_at ? r.created_at.split(' ')[1]?.substring(0, 5) : '';
-            return `<div class="timer-record"><div class="tr-status ${r.completed ? 'done' : 'stopped'}">${r.completed ? '✓' : '✗'}</div><div class="tr-info"><div class="tr-name">${escHtml(r.task_name)}</div><div class="tr-meta">${time ? time + ' · ' : ''}${m}分钟 / 计划${r.planned_minutes}分钟${r.completed ? '' : ' · 中途停止'}</div></div><button class="tr-delete" data-id="${r.id}" title="删除">×</button></div>`;
+            const timePart = time ? time + ' · ' : '';
+            const meta = this.t('timer.recordMeta', { time: timePart, minutes: m, planned: r.planned_minutes });
+            const stopped = r.completed ? '' : this.t('timer.recordStopped');
+            return `<div class="timer-record"><div class="tr-status ${r.completed ? 'done' : 'stopped'}">${r.completed ? '✓' : '✗'}</div><div class="tr-info"><div class="tr-name">${escHtml(r.task_name)}</div><div class="tr-meta">${meta}${stopped}</div></div><button class="tr-delete" data-id="${r.id}" title="${this.t('popover.delete')}">×</button></div>`;
         }).join('');
         list.querySelectorAll('.tr-delete').forEach(btn => btn.addEventListener('click', () => this.deleteRecord(parseInt(btn.dataset.id))));
     }
@@ -412,7 +454,7 @@ export class TimerManager {
             resetBtn.addEventListener('click', () => {
                 this.pomodoroCount = 0;
                 this.updatePomodoroIndicator();
-                showToast('番茄钟计数已重置');
+                showToast(this.t('timer.pomodoroReset'));
             });
         }
     }

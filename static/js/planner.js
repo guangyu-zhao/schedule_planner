@@ -1,4 +1,4 @@
-import { COLORS, CATEGORY_ICONS, SLOT_HEIGHT, TOTAL_SLOTS, MIN_EVENT_SLOTS, DAY_NAMES } from './constants.js';
+import { COLORS, CATEGORY_ICONS, SLOT_HEIGHT, TOTAL_SLOTS, MIN_EVENT_SLOTS, getCategoryLabel } from './constants.js';
 import { fmtDateISO, escHtml, showToast } from './helpers.js';
 
 export class PlannerApp {
@@ -77,8 +77,15 @@ export class PlannerApp {
         const sel = this.selectedDateStr();
         const todayStr = fmtDateISO(new Date());
 
-        let html = `<div class="cal-nav"><button class="sch-cal-prev">‹</button><span>${year}年${month + 1}月</span><button class="sch-cal-next">›</button></div>`;
-        html += '<div class="cal-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>';
+        const weekdays = (window.I18n && window.I18n.t) ? window.I18n.t('cal.weekdays') : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysArr = Array.isArray(weekdays) ? weekdays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdaysHtml = weekdaysArr.map(w => `<span>${w}</span>`).join('');
+
+        const monthLabel = (window.I18n && window.I18n.formatMonth) ? window.I18n.formatMonth(year, month) : `${year}年${month + 1}月`;
+        const todayBtn = (window.I18n && window.I18n.t) ? window.I18n.t('cal.today') : 'Today';
+
+        let html = `<div class="cal-nav"><button class="sch-cal-prev">‹</button><span>${monthLabel}</span><button class="sch-cal-next">›</button></div>`;
+        html += `<div class="cal-weekdays">${weekdaysHtml}</div>`;
         html += '<div class="cal-grid">';
         for (let i = 0; i < 42; i++) {
             const day = new Date(startDate);
@@ -91,7 +98,7 @@ export class PlannerApp {
             html += `<div class="${cls}" data-date="${ds}">${day.getDate()}</div>`;
         }
         html += '</div>';
-        html += '<button class="today-btn">回到今天</button>';
+        html += `<button class="today-btn">${todayBtn}</button>`;
 
         const container = document.getElementById('scheduleCal');
         container.innerHTML = html;
@@ -122,8 +129,8 @@ export class PlannerApp {
 
     updateDateLabel() {
         const d = this.selectedDate;
-        document.getElementById('scheduleDateLabel').textContent =
-            `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${DAY_NAMES[d.getDay()]}`;
+        const label = (window.I18n && window.I18n.formatDate) ? window.I18n.formatDate(d) : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        document.getElementById('scheduleDateLabel').textContent = label;
     }
 
     onDateChange() {
@@ -187,7 +194,7 @@ export class PlannerApp {
             el.innerHTML =
                 `<div class="resize-handle resize-handle-top"></div>` +
                 `<div class="event-title">${escHtml(evt.title)}${recurIcon}</div>` +
-                (showMeta ? `<div class="event-meta">${escHtml(evt.start_time)}-${escHtml(evt.end_time)} · ${CATEGORY_ICONS[evt.category] || ''}${escHtml(evt.category)}</div>` : '') +
+                (showMeta ? `<div class="event-meta">${escHtml(evt.start_time)}-${escHtml(evt.end_time)} · ${CATEGORY_ICONS[evt.category] || ''}${escHtml(getCategoryLabel(evt.category))}</div>` : '') +
                 `<div class="resize-handle resize-handle-bottom"></div>`;
 
             el.setAttribute('draggable', 'true');
@@ -252,6 +259,8 @@ export class PlannerApp {
             e => e.date === todayStr && (e.col_type || 'plan') === 'plan' && !e.completed
         );
 
+        const t = (k, p) => (window.I18n && window.I18n.t) ? window.I18n.t(k, p) : k;
+
         for (const evt of planEvents) {
             if (this.notifiedEventIds.has(evt.id)) continue;
             const [h, m] = evt.start_time.split(':').map(Number);
@@ -262,8 +271,8 @@ export class PlannerApp {
             if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
                 const timer = setTimeout(() => {
                     this.notifiedEventIds.add(evt.id);
-                    new Notification('即将开始', {
-                        body: `"${evt.title}" 将在 5 分钟后开始 (${evt.start_time})`,
+                    new Notification(t('notification.startingSoon'), {
+                        body: t('notification.startingIn5', { title: evt.title, time: evt.start_time }),
                         icon: '/static/icons/icon-192.png',
                         tag: `event-${evt.id}`,
                     });
@@ -272,8 +281,8 @@ export class PlannerApp {
             } else if (delay > -60000 && delay <= 0) {
                 if (!this.notifiedEventIds.has(`now-${evt.id}`)) {
                     this.notifiedEventIds.add(`now-${evt.id}`);
-                    new Notification('现在开始', {
-                        body: `"${evt.title}" 已经开始 (${evt.start_time}-${evt.end_time})`,
+                    new Notification(t('notification.nowStarting'), {
+                        body: t('notification.started', { title: evt.title, time: `${evt.start_time}-${evt.end_time}` }),
                         icon: '/static/icons/icon-192.png',
                         tag: `event-now-${evt.id}`,
                     });
@@ -307,10 +316,18 @@ export class PlannerApp {
                 body: JSON.stringify({ start: ds, end: ds }),
             }).catch(() => {});
             const r = await fetch(`/api/events?start=${ds}&end=${ds}`);
-            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '加载日程失败', { type: 'error' }); return; }
+            if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                const msg = (window.I18n && window.I18n.translateError) ? window.I18n.translateError(d.error) : d.error;
+                showToast(msg || ((window.I18n && window.I18n.t) ? window.I18n.t('toast.loadFailed') : 'Failed to load events'), { type: 'error' });
+                return;
+            }
             this.events = await r.json();
             this.renderEvents();
-        } catch (e) { console.error(e); showToast('网络错误，无法加载日程', { type: 'error' }); }
+        } catch (e) {
+            console.error(e);
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.networkError') : 'Network error', { type: 'error' });
+        }
     }
 
     async createEvent(data) {
@@ -320,12 +337,21 @@ export class PlannerApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '创建日程失败', { type: 'error' }); return null; }
+            if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                const msg = (window.I18n && window.I18n.translateError) ? window.I18n.translateError(d.error) : d.error;
+                showToast(msg || ((window.I18n && window.I18n.t) ? window.I18n.t('toast.createFailed') : 'Failed to create event'), { type: 'error' });
+                return null;
+            }
             const result = await r.json();
             if (result.event) this.events.push(result.event);
             this.renderEvents();
             return result;
-        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
+        } catch (e) {
+            console.error(e);
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.networkError') : 'Network error', { type: 'error' });
+            return null;
+        }
     }
 
     async updateEvent(id, data) {
@@ -335,24 +361,42 @@ export class PlannerApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '更新日程失败', { type: 'error' }); return null; }
+            if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                const msg = (window.I18n && window.I18n.translateError) ? window.I18n.translateError(d.error) : d.error;
+                showToast(msg || ((window.I18n && window.I18n.t) ? window.I18n.t('toast.updateFailed') : 'Failed to update event'), { type: 'error' });
+                return null;
+            }
             const u = await r.json();
             const idx = this.events.findIndex(e => e.id === id);
             if (idx !== -1) this.events[idx] = u;
             this.renderEvents();
             return u;
-        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
+        } catch (e) {
+            console.error(e);
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.networkError') : 'Network error', { type: 'error' });
+            return null;
+        }
     }
 
     async deleteEvent(id) {
         try {
             const r = await fetch(`/api/events/${id}`, { method: 'DELETE' });
-            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '删除失败', { type: 'error' }); return null; }
+            if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                const msg = (window.I18n && window.I18n.translateError) ? window.I18n.translateError(d.error) : d.error;
+                showToast(msg || ((window.I18n && window.I18n.t) ? window.I18n.t('toast.deleteFailed') : 'Failed to delete'), { type: 'error' });
+                return null;
+            }
             const data = await r.json();
             this.events = this.events.filter(e => e.id !== id);
             this.renderEvents();
             return data.event;
-        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
+        } catch (e) {
+            console.error(e);
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.networkError') : 'Network error', { type: 'error' });
+            return null;
+        }
     }
 
     async moveEventToColumn(evt, targetColType, startTime, endTime) {
@@ -366,7 +410,8 @@ export class PlannerApp {
             col_type: targetColType,
         };
         await this.createEvent(data);
-        showToast(`已移动到${targetColType === 'actual' ? '实际执行' : '计划'}列`);
+        const key = targetColType === 'actual' ? 'toast.movedToActual' : 'toast.movedToPlan';
+        showToast((window.I18n && window.I18n.t) ? window.I18n.t(key) : (targetColType === 'actual' ? 'Moved to Actual column' : 'Moved to Plan column'));
     }
 
     async batchUpdateEvents(items) {
@@ -665,7 +710,7 @@ export class PlannerApp {
     showCreateModal(date, startTime, endTime) {
         this.editingEvent = null;
         this.selectedColor = this.getNextColor(date);
-        document.getElementById('modalTitle').textContent = '新建日程';
+        document.getElementById('modalTitle').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.newEvent') : 'New Event';
         document.getElementById('eventTitle').value = '';
         document.getElementById('eventDate').value = date;
         document.getElementById('eventStart').value = startTime;
@@ -676,7 +721,7 @@ export class PlannerApp {
         document.getElementById('eventRecur').value = '';
         document.getElementById('deleteBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'none';
-        document.getElementById('saveBtn').textContent = '保存';
+        document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.save') : 'Save';
         this.buildColorPicker();
         this.openModal();
         setTimeout(() => document.getElementById('eventTitle').focus(), 100);
@@ -686,7 +731,7 @@ export class PlannerApp {
         this.editingEvent = event;
         this.editingColType = event.col_type || 'plan';
         this.selectedColor = event.color;
-        document.getElementById('modalTitle').textContent = '编辑日程';
+        document.getElementById('modalTitle').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.editEvent') : 'Edit Event';
         document.getElementById('eventTitle').value = event.title;
         document.getElementById('eventDate').value = event.date;
         document.getElementById('eventStart').value = event.start_time;
@@ -697,7 +742,7 @@ export class PlannerApp {
         document.getElementById('eventRecur').value = event.recur_rule || '';
         document.getElementById('deleteBtn').style.display = 'inline-flex';
         document.getElementById('completeBtn').style.display = 'none';
-        document.getElementById('saveBtn').textContent = '更新';
+        document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.update') : 'Update';
         this.buildColorPicker();
         this.openModal();
     }
@@ -726,12 +771,15 @@ export class PlannerApp {
             completed: this.editingEvent ? this.editingEvent.completed : 0,
             recur_rule: document.getElementById('eventRecur').value || null,
         };
-        if (data.start_time >= data.end_time) { showToast('结束时间必须晚于开始时间'); return; }
+        if (data.start_time >= data.end_time) {
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.startTimeError') : 'End time must be after start time');
+            return;
+        }
 
         if (this.editingEvent) {
             if (!this._undoing) this.undoHistory.push({ type: 'edit', id: this.editingEvent.id, prevData: { ...this.editingEvent } });
             await this.updateEvent(this.editingEvent.id, data);
-            showToast('日程已更新');
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventUpdated') : 'Event updated');
         } else {
             const colType = this.editingColType || 'plan';
             data.col_type = colType;
@@ -739,7 +787,7 @@ export class PlannerApp {
             if (result && result.event) {
                 if (!this._undoing) this.undoHistory.push({ type: 'create', eventIds: [result.event.id] });
             }
-            showToast('日程已创建');
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventCreated') : 'Event created');
         }
         this.closeModal();
     }
@@ -767,9 +815,11 @@ export class PlannerApp {
             completeBtn.style.display = 'none';
         } else {
             completeBtn.style.display = '';
+            const undoLabel = (window.I18n && window.I18n.t) ? window.I18n.t('popover.undoComplete') : 'Undo Complete';
+            const completeLabel = (window.I18n && window.I18n.t) ? window.I18n.t('popover.complete') : 'Complete';
             completeBtn.innerHTML = event.completed
-                ? '<span class="popover-icon">↩</span> 取消完成'
-                : '<span class="popover-icon">✓</span> 完成';
+                ? `<span class="popover-icon">↩</span> ${undoLabel}`
+                : `<span class="popover-icon">✓</span> ${completeLabel}`;
         }
 
         const rect = mouseEvent.target.closest('.event').getBoundingClientRect();
@@ -794,13 +844,18 @@ export class PlannerApp {
             const prevCompleted = event.completed;
             if (!this._undoing) this.undoHistory.push({ type: 'complete', id, prevCompleted });
             await this.updateEvent(id, { ...event, completed: prevCompleted ? 0 : 1 });
-            showToast(prevCompleted ? '已取消完成' : '已标记完成 ✓');
+            const msg = prevCompleted
+                ? ((window.I18n && window.I18n.t) ? window.I18n.t('toast.unmarkedComplete') : 'Unmarked complete')
+                : ((window.I18n && window.I18n.t) ? window.I18n.t('toast.markedComplete') : 'Marked complete ✓');
+            showToast(msg);
         } else if (action === 'edit') {
             this.showEditModal(event);
         } else if (action === 'delete') {
             if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...event } });
             const d = await this.deleteEvent(id);
-            if (d) { showToast('日程已删除', { undo: true }); }
+            if (d) {
+                showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventDeleted') : 'Event deleted', { undo: true });
+            }
             this.deselectEvent();
         }
     }
@@ -811,7 +866,11 @@ export class PlannerApp {
     }
 
     async undo() {
-        if (this.undoHistory.length === 0) { showToast('没有可撤销的操作'); return; }
+        const t = (k) => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
+        if (this.undoHistory.length === 0) {
+            showToast(t('toast.noUndo'));
+            return;
+        }
         const action = this.undoHistory.pop();
         this._undoing = true;
         try {
@@ -821,10 +880,10 @@ export class PlannerApp {
                     this.events = this.events.filter(e => e.id !== id);
                 }
                 this.renderEvents();
-                showToast('已撤销创建');
+                showToast(t('toast.undoCreate'));
             } else if (action.type === 'edit') {
                 await this.updateEvent(action.id, action.prevData);
-                showToast('已撤销编辑');
+                showToast(t('toast.undoEdit'));
             } else if (action.type === 'delete') {
                 const ev = action.eventData;
                 await this.createEvent({
@@ -833,16 +892,16 @@ export class PlannerApp {
                     category: ev.category, priority: ev.priority, completed: ev.completed,
                     col_type: ev.col_type || 'plan',
                 });
-                showToast('已撤销删除');
+                showToast(t('toast.undoDelete'));
             } else if (action.type === 'complete') {
                 const evt = this.events.find(e => e.id === action.id);
                 if (evt) {
                     await this.updateEvent(action.id, { ...evt, completed: action.prevCompleted });
-                    showToast('已撤销完成状态变更');
+                    showToast(t('toast.undoComplete'));
                 }
             } else if (action.type === 'resize') {
                 await this.batchUpdateEvents(action.items);
-                showToast('已撤销调整');
+                showToast(t('toast.undoResize'));
             }
         } finally {
             this._undoing = false;
@@ -859,7 +918,7 @@ export class PlannerApp {
             if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...ev } });
             await this.deleteEvent(ev.id);
             this.closeModal();
-            showToast('日程已删除', { undo: true });
+            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventDeleted') : 'Event deleted', { undo: true });
         });
         document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) this.closeModal(); });
         document.getElementById('popoverComplete').addEventListener('click', () => this.handlePopoverAction('complete'));
@@ -1061,11 +1120,12 @@ export class PlannerApp {
         const ind = document.getElementById('noteSaveIndicator');
         if (!ind) return;
         ind.className = 'note-save-indicator';
+        const t = (k) => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
         if (state === 'saving') {
-            ind.textContent = '保存中...';
+            ind.textContent = t('schedule.notesSaveIndicator.saving');
             ind.classList.add('saving');
         } else if (state === 'saved') {
-            ind.textContent = '已保存';
+            ind.textContent = t('schedule.notesSaveIndicator.saved');
             ind.classList.add('saved');
             clearTimeout(this._savedIndicatorTimer);
             this._savedIndicatorTimer = setTimeout(() => {
@@ -1092,12 +1152,16 @@ export class PlannerApp {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ date: dateToSave, content: contentToSave }),
                 });
-                if (!r.ok) { this.updateSaveIndicator(''); showToast('笔记保存失败', { type: 'error' }); return; }
+                if (!r.ok) {
+                    this.updateSaveIndicator('');
+                    showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.noteSaveFailed') : 'Failed to save note', { type: 'error' });
+                    return;
+                }
                 this.updateSaveIndicator('saved');
             } catch (e) {
                 console.error(e);
                 this.updateSaveIndicator('');
-                showToast('网络错误，笔记保存失败', { type: 'error' });
+                showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.noteNetworkError') : 'Network error, failed to save note', { type: 'error' });
             }
         }, 800);
     }
@@ -1130,8 +1194,9 @@ export class PlannerApp {
 
     renderNotePreview() {
         const preview = document.getElementById('notesPreview');
+        const emptyText = (window.I18n && window.I18n.t) ? window.I18n.t('schedule.previewEmpty') : 'Preview area — type Markdown content in the editor above';
         if (!this.noteContent.trim()) {
-            preview.innerHTML = '<p style="color:var(--text-muted);font-style:italic">预览区域 — 在上方编辑器中输入 Markdown 内容</p>';
+            preview.innerHTML = `<p style="color:var(--text-muted);font-style:italic">${emptyText}</p>`;
             return;
         }
         if (typeof marked !== 'undefined') {

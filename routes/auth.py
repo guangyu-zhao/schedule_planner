@@ -88,10 +88,11 @@ def register():
 
     password_hash = generate_password_hash(password)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    language = (data.get("language") or "").strip() or ""
     cursor = conn.execute(
-        """INSERT INTO users (email, username, password_hash, last_login)
-           VALUES (?, ?, ?, ?)""",
-        (email, username, password_hash, now),
+        """INSERT INTO users (email, username, password_hash, last_login, language)
+           VALUES (?, ?, ?, ?, ?)""",
+        (email, username, password_hash, now, language),
     )
     conn.commit()
     user_id = cursor.lastrowid
@@ -137,7 +138,7 @@ def login():
     locked, remaining = _check_login_lockout(lockout_key)
     if locked:
         logger.warning("登录锁定: %s, 剩余 %ds", email, remaining)
-        return jsonify({"error": f"登录尝试过多，请 {remaining // 60 + 1} 分钟后重试"}), 429
+        return jsonify({"error": "登录尝试过多，请稍后重试"}), 429
 
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
@@ -157,6 +158,13 @@ def login():
     u = dict(user)
     u.pop("password_hash", None)
     u["last_login"] = now
+
+    language = data.get("language")
+    if language and not u.get("language"):
+        conn.execute("UPDATE users SET language=? WHERE id=?", (language, user["id"]))
+        conn.commit()
+        u["language"] = language
+
     return jsonify({"user": u})
 
 

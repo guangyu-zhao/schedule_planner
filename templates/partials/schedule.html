@@ -8,21 +8,21 @@
             <div class="schedule-grid-panel">
                 <div class="schedule-col-headers">
                     <div class="col-header-gutter"></div>
-                    <div class="col-header plan-header">计划</div>
-                    <div class="col-header actual-header">实际执行</div>
+                    <div class="col-header plan-header" data-i18n="schedule.plan">Plan</div>
+                    <div class="col-header actual-header" data-i18n="schedule.actual">Actual</div>
                 </div>
                 <div class="schedule-grid" id="scheduleGrid"></div>
             </div>
             <div class="notes-panel">
                 <div class="notes-header">
-                    <span class="notes-title">📝 笔记 <span class="note-save-indicator" id="noteSaveIndicator"></span></span>
+                    <span class="notes-title">📝 <span data-i18n="schedule.notes">Notes</span> <span class="note-save-indicator" id="noteSaveIndicator"></span></span>
                     <div class="notes-tabs">
-                        <button class="notes-tab active" data-mode="edit">编辑</button>
-                        <button class="notes-tab" data-mode="preview">预览</button>
+                        <button class="notes-tab active" data-mode="edit" data-i18n="schedule.edit">Edit</button>
+                        <button class="notes-tab" data-mode="preview" data-i18n="schedule.preview">Preview</button>
                     </div>
                 </div>
                 <div class="notes-body">
-                    <textarea id="notesEditor" class="notes-editor" placeholder="在这里写笔记...&#10;&#10;支持 Markdown + LaTeX：&#10;# 标题&#10;**加粗** *斜体*&#10;- 列表项&#10;> 引用&#10;`代码`&#10;$E=mc^2$ 行内公式&#10;$$ \int_0^\infty e^{-x} dx $$ 块级公式"></textarea>
+                    <textarea id="notesEditor" class="notes-editor" data-i18n-placeholder="schedule.notesPlaceholder" placeholder="Write your notes here...&#10;&#10;Supports Markdown + LaTeX:&#10;# Heading&#10;**bold** *italic*&#10;- list item&#10;> quote&#10;`code`&#10;$E=mc^2$ inline formula&#10;$$ \int_0^\infty e^{-x} dx $$ block formula"></textarea>
                     <div id="notesPreview" class="notes-preview markdown-body"></div>
                 </div>
             </div>

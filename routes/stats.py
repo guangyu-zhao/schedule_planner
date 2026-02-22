@@ -17,15 +17,15 @@ def get_stats():
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     total = conn.execute(
-        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='plan'",
+        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='actual'",
         (g.user_id, date),
     ).fetchone()["count"]
     completed = conn.execute(
-        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='plan' AND completed = 1",
+        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='actual' AND completed = 1",
         (g.user_id, date),
     ).fetchone()["count"]
     events = conn.execute(
-        "SELECT start_time, end_time FROM events WHERE user_id=? AND date = ? AND col_type='plan'",
+        "SELECT start_time, end_time FROM events WHERE user_id=? AND date = ? AND col_type='actual'",
         (g.user_id, date),
     ).fetchall()
     total_minutes = 0

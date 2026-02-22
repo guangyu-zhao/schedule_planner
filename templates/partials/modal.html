@@ -2,60 +2,60 @@
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal" id="eventModal">
         <div class="modal-header">
-            <h3 id="modalTitle">新建日程</h3>
+            <h3 id="modalTitle">New Event</h3>
             <button class="modal-close" id="modalClose">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
-                <label for="eventTitle">标题 <span class="required">*</span></label>
-                <input type="text" id="eventTitle" placeholder="要做什么？" maxlength="100">
+                <label for="eventTitle"><span data-i18n="modal.title">Title</span> <span class="required">*</span></label>
+                <input type="text" id="eventTitle" data-i18n-placeholder="modal.title.placeholder" placeholder="What to do?" maxlength="100">
             </div>
             <div class="form-row">
-                <div class="form-group"><label for="eventDate">日期</label><input type="date" id="eventDate"></div>
-                <div class="form-group"><label for="eventStart">开始</label><select id="eventStart"></select></div>
-                <div class="form-group"><label for="eventEnd">结束</label><select id="eventEnd"></select></div>
+                <div class="form-group"><label for="eventDate" data-i18n="modal.date">Date</label><input type="date" id="eventDate"></div>
+                <div class="form-group"><label for="eventStart" data-i18n="modal.start">Start</label><select id="eventStart"></select></div>
+                <div class="form-group"><label for="eventEnd" data-i18n="modal.end">End</label><select id="eventEnd"></select></div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="eventCategory">分类</label>
+                    <label for="eventCategory" data-i18n="modal.category">Category</label>
                     <select id="eventCategory">
-                        <option value="工作" selected>💼 工作</option>
-                        <option value="学习">📚 学习</option>
-                        <option value="个人">👤 个人</option>
-                        <option value="运动">🏃 运动</option>
-                        <option value="其他">📌 其他</option>
+                        <option value="工作" selected>💼 Work</option>
+                        <option value="学习">📚 Study</option>
+                        <option value="个人">👤 Personal</option>
+                        <option value="运动">🏃 Exercise</option>
+                        <option value="其他">📌 Other</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="eventPriority">优先级</label>
+                    <label for="eventPriority" data-i18n="modal.priority">Priority</label>
                     <select id="eventPriority">
-                        <option value="1" selected>🔴 高</option>
-                        <option value="2">🟡 中</option>
-                        <option value="3">🟢 低</option>
+                        <option value="1" selected>🔴 High</option>
+                        <option value="2">🟡 Medium</option>
+                        <option value="3">🟢 Low</option>
                     </select>
                 </div>
             </div>
             <div class="form-group">
-                <label for="eventRecur">重复</label>
+                <label for="eventRecur" data-i18n="modal.repeat">Repeat</label>
                 <select id="eventRecur">
-                    <option value="">不重复</option>
-                    <option value="daily">每天</option>
-                    <option value="weekdays">每个工作日</option>
-                    <option value="weekly">每周</option>
-                    <option value="monthly">每月</option>
+                    <option value="">No Repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
                 </select>
             </div>
-            <div class="form-group"><label>颜色</label><div class="color-picker" id="colorPicker"></div></div>
-            <div class="form-group"><label for="eventDescription">备注</label><textarea id="eventDescription" placeholder="添加备注..." rows="3"></textarea></div>
+            <div class="form-group"><label data-i18n="modal.color">Color</label><div class="color-picker" id="colorPicker"></div></div>
+            <div class="form-group"><label for="eventDescription" data-i18n="modal.description">Description</label><textarea id="eventDescription" data-i18n-placeholder="modal.description.placeholder" placeholder="Add notes..." rows="3"></textarea></div>
         </div>
         <div class="modal-footer">
             <div class="modal-footer-left">
-                <button class="btn btn-danger" id="deleteBtn" style="display:none">删除</button>
+                <button class="btn btn-danger" id="deleteBtn" style="display:none" data-i18n="modal.delete">Delete</button>
             </div>
             <div class="modal-footer-right">
-                <button class="btn btn-secondary" id="cancelBtn">取消</button>
-                <button class="btn btn-success" id="completeBtn" style="display:none">✓ 完成</button>
-                <button class="btn btn-primary" id="saveBtn">保存</button>
+                <button class="btn btn-secondary" id="cancelBtn" data-i18n="modal.cancel">Cancel</button>
+                <button class="btn btn-success" id="completeBtn" style="display:none">✓ Complete</button>
+                <button class="btn btn-primary" id="saveBtn" data-i18n="modal.save">Save</button>
             </div>
         </div>
     </div>
@@ -65,24 +65,24 @@
 <div class="modal-overlay" id="deleteAccountModal">
     <div class="modal" style="width: 400px;">
         <div class="modal-header">
-            <h3 style="color: var(--danger);">删除账户</h3>
+            <h3 data-i18n="deleteAccount.title" style="color: var(--danger);">Delete Account</h3>
             <button class="modal-close" onclick="document.getElementById('deleteAccountModal').classList.remove('active')">&times;</button>
         </div>
         <div class="modal-body">
-            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-                此操作<strong style="color:var(--danger)">不可撤销</strong>。删除账户后，所有日程、计时记录、笔记等数据将被永久删除。
+            <p data-i18n="deleteAccount.warning" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+                This action is <strong style="color:var(--danger)">irreversible</strong>. All schedules, timer records, notes and other data will be permanently deleted.
             </p>
             <div class="form-group">
-                <label for="deleteAccountPwd">请输入密码以确认</label>
-                <input type="password" id="deleteAccountPwd" placeholder="输入您的密码" autocomplete="current-password">
+                <label for="deleteAccountPwd" data-i18n="deleteAccount.confirmLabel">Enter password to confirm</label>
+                <input type="password" id="deleteAccountPwd" data-i18n-placeholder="deleteAccount.placeholder" placeholder="Enter your password" autocomplete="current-password">
             </div>
             <div class="auth-error" id="deleteAccountError" style="min-height:0;margin:0 0 8px;"></div>
         </div>
         <div class="modal-footer">
             <div></div>
             <div class="modal-footer-right">
-                <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').classList.remove('active')">取消</button>
-                <button class="btn btn-danger" id="confirmDeleteAccountBtn" onclick="confirmDeleteAccount()">确认删除</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').classList.remove('active')" data-i18n="deleteAccount.cancel">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteAccountBtn" onclick="confirmDeleteAccount()" data-i18n="deleteAccount.confirm">Confirm Delete</button>
             </div>
         </div>
     </div>
@@ -92,28 +92,28 @@
 <div class="modal-overlay" id="shortcutsModal">
     <div class="modal" style="width: 480px;">
         <div class="modal-header">
-            <h3>键盘快捷键</h3>
+            <h3 data-i18n="shortcuts.title">Keyboard Shortcuts</h3>
             <button class="modal-close" onclick="document.getElementById('shortcutsModal').classList.remove('active')">&times;</button>
         </div>
         <div class="modal-body" style="padding:12px 20px;">
             <div class="shortcut-section">
-                <h4 class="shortcut-section-title">日程安排表</h4>
-                <div class="shortcut-row"><span class="shortcut-desc">撤销操作</span><kbd>Ctrl</kbd> + <kbd>Z</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">编辑选中日程</span><kbd>Enter</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">删除选中日程</span><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">切换完成状态</span><kbd>Space</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">快速新建日程</span><kbd>N</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">关闭弹出窗口</span><kbd>Esc</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">保存日程</span><kbd>Enter</kbd>（在编辑框内）</div>
+                <h4 class="shortcut-section-title" data-i18n="shortcuts.schedule">Schedule</h4>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.undo">Undo</span><kbd>Ctrl</kbd> + <kbd>Z</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.editEvent">Edit selected event</span><kbd>Enter</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.deleteEvent">Delete selected event</span><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.toggleComplete">Toggle complete status</span><kbd>Space</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.newEvent">Quick new event</span><kbd>N</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.closePopup">Close popup</span><kbd>Esc</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.saveEvent">Save event</span><kbd>Enter</kbd> (in edit box)</div>
             </div>
             <div class="shortcut-section">
-                <h4 class="shortcut-section-title">笔记编辑器</h4>
-                <div class="shortcut-row"><span class="shortcut-desc">缩进</span><kbd>Tab</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc">取消缩进</span><kbd>Shift</kbd> + <kbd>Tab</kbd></div>
+                <h4 class="shortcut-section-title" data-i18n="shortcuts.notes">Notes Editor</h4>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.indent">Indent</span><kbd>Tab</kbd></div>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.outdent">Outdent</span><kbd>Shift</kbd> + <kbd>Tab</kbd></div>
             </div>
             <div class="shortcut-section">
-                <h4 class="shortcut-section-title">全局</h4>
-                <div class="shortcut-row"><span class="shortcut-desc">打开快捷键帮助</span><kbd>?</kbd></div>
+                <h4 class="shortcut-section-title" data-i18n="shortcuts.global">Global</h4>
+                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.openShortcuts">Open shortcuts help</span><kbd>?</kbd></div>
             </div>
         </div>
     </div>
@@ -121,13 +121,13 @@
 
 <!-- Action Popover -->
 <div class="popover" id="actionPopover">
-    <button class="popover-btn" id="popoverEdit"><span class="popover-icon">✏️</span> 编辑</button>
-    <button class="popover-btn" id="popoverComplete"><span class="popover-icon">✓</span> 完成</button>
-    <button class="popover-btn popover-btn-danger" id="popoverDelete"><span class="popover-icon">🗑️</span> 删除</button>
+    <button class="popover-btn" id="popoverEdit"><span class="popover-icon">✏️</span> <span data-i18n="popover.edit">Edit</span></button>
+    <button class="popover-btn" id="popoverComplete"><span class="popover-icon">✓</span> <span data-i18n="popover.complete">Complete</span></button>
+    <button class="popover-btn popover-btn-danger" id="popoverDelete"><span class="popover-icon">🗑️</span> <span data-i18n="popover.delete">Delete</span></button>
 </div>
 
 <!-- Toast -->
 <div class="toast" id="toast">
     <span class="toast-message" id="toastMessage"></span>
-    <button class="toast-action" id="toastAction" style="display:none">撤销</button>
+    <button class="toast-action" id="toastAction" style="display:none" data-i18n="toast.undo">Undo</button>
 </div>

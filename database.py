@@ -77,6 +77,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             avatar TEXT DEFAULT '',
             bio TEXT DEFAULT '',
+            language TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now','localtime')),
             updated_at TEXT DEFAULT (datetime('now','localtime')),
             last_login TEXT
@@ -195,6 +196,12 @@ def init_db():
         )
     """
     )
+
+    for col, sql in [("language", "ALTER TABLE users ADD COLUMN language TEXT DEFAULT ''")]:
+        try:
+            conn.execute(sql)
+        except Exception:
+            pass
 
     _migrate(conn)
     conn.commit()

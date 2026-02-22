@@ -8,15 +8,20 @@ function showForm(name) {
         document.getElementById('forgotStep1').style.display = '';
         document.getElementById('forgotStep2').style.display = 'none';
         document.getElementById('forgotStep3').style.display = 'none';
-        document.getElementById('forgotSubtitle').textContent = '输入您的注册邮箱，我们将发送验证码';
+        document.getElementById('forgotSubtitle').textContent = (window.I18n && I18n.t) ? I18n.t('auth.reset.subtitle') : "Enter your registered email, we'll send a verification code";
     }
 }
 
 function setLoading(btnId, loading) {
     const btn = document.getElementById(btnId);
     btn.disabled = loading;
-    btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
-    btn.textContent = loading ? '处理中...' : btn.dataset.originalText;
+    const i18nKey = btn.getAttribute('data-i18n');
+    if (loading) {
+        btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+        btn.textContent = (window.I18n && I18n.t) ? I18n.t('auth.processing') : 'Processing...';
+    } else {
+        btn.textContent = (i18nKey && window.I18n && I18n.t) ? I18n.t(i18nKey) : (btn.dataset.originalText || '');
+    }
 }
 
 function showError(id, msg) {
@@ -44,16 +49,17 @@ async function handleLogin(e) {
                 email: document.getElementById('loginEmail').value.trim(),
                 password: document.getElementById('loginPassword').value,
                 remember: document.getElementById('loginRemember').checked,
+                language: (window.I18n && I18n.getLanguage) ? I18n.getLanguage() : 'en',
             }),
         });
         const data = await res.json();
         if (!res.ok) {
-            showError('loginError', data.error || '登录失败');
+            showError('loginError', (window.I18n && I18n.translateError) ? I18n.translateError(data.error) || I18n.t('auth.loginFailed') : (data.error || 'Login failed'));
             return;
         }
         window.location.href = '/';
     } catch {
-        showError('loginError', '网络错误，请稍后重试');
+        showError('loginError', (window.I18n && I18n.t) ? I18n.t('auth.networkError') : 'Network error, please try again later');
     } finally {
         setLoading('loginBtn', false);
     }
@@ -67,7 +73,7 @@ async function handleRegister(e) {
     const password = document.getElementById('regPassword').value;
     const confirm = document.getElementById('regConfirm').value;
     if (password !== confirm) {
-        showError('registerError', '两次输入的密码不一致');
+        showError('registerError', (window.I18n && I18n.t) ? I18n.t('auth.passwordMismatch') : 'Passwords do not match');
         return false;
     }
 
@@ -80,16 +86,17 @@ async function handleRegister(e) {
                 email: document.getElementById('regEmail').value.trim(),
                 username: document.getElementById('regUsername').value.trim(),
                 password: password,
+                language: (window.I18n && I18n.getLanguage) ? I18n.getLanguage() : 'en',
             }),
         });
         const data = await res.json();
         if (!res.ok) {
-            showError('registerError', data.error || '注册失败');
+            showError('registerError', (window.I18n && I18n.translateError) ? I18n.translateError(data.error) || I18n.t('auth.registerFailed') : (data.error || 'Registration failed'));
             return;
         }
         window.location.href = '/';
     } catch {
-        showError('registerError', '网络错误，请稍后重试');
+        showError('registerError', (window.I18n && I18n.t) ? I18n.t('auth.networkError') : 'Network error, please try again later');
     } finally {
         setLoading('registerBtn', false);
     }
@@ -112,14 +119,14 @@ async function handleForgot(e) {
         });
         const data = await res.json();
         if (!res.ok) {
-            showError('forgotError', data.error || '发送失败');
+            showError('forgotError', (window.I18n && I18n.translateError) ? I18n.translateError(data.error) || I18n.t('auth.sendFailed') : (data.error || 'Failed to send'));
             return;
         }
         document.getElementById('forgotStep1').style.display = 'none';
         document.getElementById('forgotStep2').style.display = '';
-        document.getElementById('forgotSubtitle').textContent = `验证码已发送至 ${forgotEmail}`;
+        document.getElementById('forgotSubtitle').textContent = (window.I18n && I18n.t) ? I18n.t('auth.codeSent').replace('{email}', forgotEmail) : `Code sent to ${forgotEmail}`;
     } catch {
-        showError('forgotError', '网络错误，请稍后重试');
+        showError('forgotError', (window.I18n && I18n.t) ? I18n.t('auth.networkError') : 'Network error, please try again later');
     } finally {
         setLoading('forgotBtn', false);
     }
@@ -142,14 +149,14 @@ async function handleVerifyCode(e) {
         });
         const data = await res.json();
         if (!res.ok) {
-            showError('verifyError', data.error || '验证失败');
+            showError('verifyError', (window.I18n && I18n.translateError) ? I18n.translateError(data.error) || I18n.t('auth.verifyFailed') : (data.error || 'Verification failed'));
             return;
         }
         document.getElementById('forgotStep2').style.display = 'none';
         document.getElementById('forgotStep3').style.display = '';
-        document.getElementById('forgotSubtitle').textContent = '请设置新密码';
+        document.getElementById('forgotSubtitle').textContent = (window.I18n && I18n.t) ? I18n.t('auth.setNewPassword') : 'Set your new password';
     } catch {
-        showError('verifyError', '网络错误，请稍后重试');
+        showError('verifyError', (window.I18n && I18n.t) ? I18n.t('auth.networkError') : 'Network error, please try again later');
     } finally {
         setLoading('verifyBtn', false);
     }
@@ -163,7 +170,7 @@ async function handleResetPassword(e) {
     const password = document.getElementById('newPassword').value;
     const confirm = document.getElementById('newConfirm').value;
     if (password !== confirm) {
-        showError('resetError', '两次输入的密码不一致');
+        showError('resetError', (window.I18n && I18n.t) ? I18n.t('auth.passwordMismatch') : 'Passwords do not match');
         return false;
     }
 
@@ -176,16 +183,15 @@ async function handleResetPassword(e) {
         });
         const data = await res.json();
         if (!res.ok) {
-            showError('resetError', data.error || '重置失败');
+            showError('resetError', (window.I18n && I18n.translateError) ? I18n.translateError(data.error) || I18n.t('auth.resetFailed') : (data.error || 'Reset failed'));
             return;
         }
-        showSuccess('resetError', '密码已重置，即将跳转到登录页...');
+        showSuccess('resetError', (window.I18n && I18n.t) ? I18n.t('auth.resetSuccess') : 'Password reset, redirecting to login...');
         setTimeout(() => showForm('login'), 1500);
     } catch {
-        showError('resetError', '网络错误，请稍后重试');
+        showError('resetError', (window.I18n && I18n.t) ? I18n.t('auth.networkError') : 'Network error, please try again later');
     } finally {
         setLoading('resetBtn', false);
     }
     return false;
 }
-

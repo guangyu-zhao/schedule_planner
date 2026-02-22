@@ -1,0 +1,44 @@
+/* ===== Top Bar ===== */
+.top-bar {
+    display: flex;
+    align-items: center;
+    height: var(--top-bar-height);
+    padding: 0 24px;
+    background: var(--text-primary);
+    color: white;
+    flex-shrink: 0;
+    z-index: 20;
+    gap: 20px;
+}
+
+.logo { font-size: 20px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.tab-nav { display: flex; gap: 4px; margin-left: 24px; }
+
+.tab {
+    padding: 8px 22px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+    font-family: inherit;
+    position: relative;
+}
+.tab:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08); }
+.tab.active { color: white; background: rgba(255,255,255,0.15); }
+
+.timer-badge {
+    display: none; position: absolute; top: 4px; right: 4px;
+    width: 8px; height: 8px; background: var(--danger); border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+.timer-badge.active { display: block; }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+.top-bar-spacer { flex: 1; }
+
+/* ===== Pages ===== */
+.page { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.page.active { display: flex; }

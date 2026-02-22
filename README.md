@@ -61,16 +61,40 @@ The SQLite database (`planner.db`) is created automatically on first run.
 
 ```
 schedule_planner/
-├── app.py                 # Flask backend & REST API
+├── app.py                 # Flask entry point
+├── config.py              # App configuration
+├── database.py            # DB connection & schema init
+├── routes/                # Flask Blueprints
+│   ├── __init__.py        # Blueprint registration
+│   ├── main.py            # Page route (/)
+│   ├── events.py          # Events CRUD API
+│   ├── timer.py           # Timer records & stats API
+│   ├── notes.py           # Notes API
+│   └── stats.py           # Statistics & analytics API
 ├── planner.db             # SQLite database (auto-created)
 ├── requirements.txt
 ├── templates/
-│   └── index.html         # Single-page HTML
+│   ├── index.html         # Main template (assembles partials)
+│   └── partials/
+│       ├── schedule.html  # Schedule page
+│       ├── timer.html     # Timer page
+│       ├── stats.html     # Statistics page
+│       └── modal.html     # Modal, popover & toast
 └── static/
     ├── css/
-    │   └── style.css      # All styles
+    │   ├── base.css       # Variables, reset, global styles
+    │   ├── layout.css     # Top bar, tabs, page layout
+    │   ├── schedule.css   # Schedule page styles
+    │   ├── timer.css      # Timer page styles
+    │   ├── stats.css      # Statistics page styles
+    │   └── components.css # Modal, popover, toast, buttons
     └── js/
-        └── app.js         # All client-side logic
+        ├── app.js         # Entry point & tab init
+        ├── constants.js   # Shared constants
+        ├── helpers.js     # Utility functions
+        ├── planner.js     # Schedule (PlannerApp class)
+        ├── timer.js       # Timer (TimerManager class)
+        └── stats.js       # Statistics (StatisticsManager class)
 ```
 
 ## API Endpoints

@@ -1,0 +1,37 @@
+<div class="page active" id="schedulePage">
+    <div class="schedule-page-inner">
+        <div class="schedule-sidebar">
+            <div class="schedule-cal" id="scheduleCal"></div>
+            <div class="schedule-date-label" id="scheduleDateLabel"></div>
+            <div class="schedule-stats">
+                <div class="ss-row"><span class="ss-label">事项</span><span class="ss-val" id="statTotal">0</span></div>
+                <div class="ss-row"><span class="ss-label">已完成</span><span class="ss-val" id="statCompleted">0</span></div>
+                <div class="ss-row"><span class="ss-label">计划时长</span><span class="ss-val" id="statHours">0h</span></div>
+                <div class="ss-row"><span class="ss-label">完成率</span><span class="ss-val" id="statRate">0%</span></div>
+            </div>
+        </div>
+        <div class="schedule-main">
+            <div class="schedule-grid-panel">
+                <div class="schedule-col-headers">
+                    <div class="col-header-gutter"></div>
+                    <div class="col-header plan-header">计划</div>
+                    <div class="col-header actual-header">实际执行</div>
+                </div>
+                <div class="schedule-grid" id="scheduleGrid"></div>
+            </div>
+            <div class="notes-panel">
+                <div class="notes-header">
+                    <span class="notes-title">📝 笔记</span>
+                    <div class="notes-tabs">
+                        <button class="notes-tab active" data-mode="edit">编辑</button>
+                        <button class="notes-tab" data-mode="preview">预览</button>
+                    </div>
+                </div>
+                <div class="notes-body">
+                    <textarea id="notesEditor" class="notes-editor" placeholder="在这里写笔记...&#10;&#10;支持 Markdown + LaTeX：&#10;# 标题&#10;**加粗** *斜体*&#10;- 列表项&#10;> 引用&#10;`代码`&#10;$E=mc^2$ 行内公式&#10;$$ \int_0^\infty e^{-x} dx $$ 块级公式"></textarea>
+                    <div id="notesPreview" class="notes-preview markdown-body"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

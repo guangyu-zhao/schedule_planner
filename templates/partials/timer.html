@@ -1,0 +1,58 @@
+<div class="page" id="timerPage">
+    <div class="timer-page-inner">
+        <div class="timer-sidebar-left">
+            <div class="timer-cal" id="timerCal"></div>
+            <div class="timer-date-label" id="timerDateLabel"></div>
+            <div class="timer-stats-card">
+                <h3>专注统计</h3>
+                <div class="timer-stats-grid">
+                    <div class="ts-item"><div class="ts-value" id="tsFocusTime">0分钟</div><div class="ts-label">总专注</div></div>
+                    <div class="ts-item"><div class="ts-value" id="tsTaskCount">0</div><div class="ts-label">任务数</div></div>
+                    <div class="ts-item"><div class="ts-value" id="tsCompleted">0</div><div class="ts-label">已完成</div></div>
+                </div>
+            </div>
+            <div class="timer-records-card">
+                <h3>条目记录</h3>
+                <div class="timer-records-list" id="timerRecordsList">
+                    <div class="timer-records-empty">暂无记录</div>
+                </div>
+            </div>
+        </div>
+        <div class="timer-main">
+            <div class="timer-setup" id="timerSetup">
+                <input type="text" class="timer-task-input" id="timerTaskName"
+                       placeholder="输入任务名称..." maxlength="60">
+                <div class="timer-ring-wrap">
+                    <svg class="timer-ring" width="280" height="280" viewBox="0 0 280 280">
+                        <circle cx="140" cy="140" r="126" fill="none" stroke="var(--border-color)" stroke-width="7" />
+                        <circle class="timer-ring-progress" cx="140" cy="140" r="126"
+                                fill="none" stroke="var(--accent)" stroke-width="7"
+                                stroke-dasharray="791.681" stroke-dashoffset="0"
+                                transform="rotate(-90 140 140)" stroke-linecap="round" />
+                    </svg>
+                    <div class="timer-ring-center">
+                        <div class="timer-display" id="timerDisplay">25:00</div>
+                        <div class="timer-state-label" id="timerStateLabel">准备开始</div>
+                    </div>
+                </div>
+                <div class="timer-adjuster">
+                    <button class="adj-btn" id="timerMinus5">−5</button>
+                    <button class="adj-btn" id="timerPlus5">+5</button>
+                </div>
+                <div class="timer-presets">
+                    <button class="preset-btn" data-min="15">15分</button>
+                    <button class="preset-btn active" data-min="25">25分</button>
+                    <button class="preset-btn" data-min="45">45分</button>
+                    <button class="preset-btn" data-min="60">60分</button>
+                </div>
+                <button class="timer-start-btn" id="timerStartBtn">▶ 开始专注</button>
+            </div>
+            <div class="timer-controls" id="timerControls" style="display:none">
+                <button class="ctrl-btn ctrl-pause" id="timerPauseBtn">⏸ 暂停</button>
+                <button class="ctrl-btn ctrl-add" id="timerAdd5">+5分</button>
+                <button class="ctrl-btn ctrl-add" id="timerAdd30">+30分</button>
+                <button class="ctrl-btn ctrl-stop" id="timerStopBtn">⏹ 停止</button>
+            </div>
+        </div>
+    </div>
+</div>

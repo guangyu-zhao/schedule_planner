@@ -1,0 +1,63 @@
+<!-- Event Modal -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="eventModal">
+        <div class="modal-header">
+            <h3 id="modalTitle">新建日程</h3>
+            <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="eventTitle">标题 <span class="required">*</span></label>
+                <input type="text" id="eventTitle" placeholder="要做什么？" maxlength="100">
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label for="eventDate">日期</label><input type="date" id="eventDate"></div>
+                <div class="form-group"><label for="eventStart">开始</label><select id="eventStart"></select></div>
+                <div class="form-group"><label for="eventEnd">结束</label><select id="eventEnd"></select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="eventCategory">分类</label>
+                    <select id="eventCategory">
+                        <option value="工作" selected>💼 工作</option>
+                        <option value="学习">📚 学习</option>
+                        <option value="个人">👤 个人</option>
+                        <option value="运动">🏃 运动</option>
+                        <option value="其他">📌 其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="eventPriority">优先级</label>
+                    <select id="eventPriority">
+                        <option value="1" selected>🔴 高</option>
+                        <option value="2">🟡 中</option>
+                        <option value="3">🟢 低</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group"><label>颜色</label><div class="color-picker" id="colorPicker"></div></div>
+            <div class="form-group"><label for="eventDescription">备注</label><textarea id="eventDescription" placeholder="添加备注..." rows="3"></textarea></div>
+        </div>
+        <div class="modal-footer">
+            <div class="modal-footer-left"><button class="btn btn-danger" id="deleteBtn" style="display:none">删除</button></div>
+            <div class="modal-footer-right">
+                <button class="btn btn-secondary" id="cancelBtn">取消</button>
+                <button class="btn btn-success" id="completeBtn" style="display:none">✓ 完成</button>
+                <button class="btn btn-primary" id="saveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Popover -->
+<div class="popover" id="actionPopover">
+    <button class="popover-btn" id="popoverEdit"><span class="popover-icon">✏️</span> 编辑</button>
+    <button class="popover-btn" id="popoverComplete"><span class="popover-icon">✓</span> 完成</button>
+    <button class="popover-btn popover-btn-danger" id="popoverDelete"><span class="popover-icon">🗑️</span> 删除</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+    <span class="toast-message" id="toastMessage"></span>
+    <button class="toast-action" id="toastAction" style="display:none">撤销</button>
+</div>

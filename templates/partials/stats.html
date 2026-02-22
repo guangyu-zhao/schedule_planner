@@ -1,0 +1,28 @@
+<div class="page" id="statsPage">
+    <div class="stats-page-inner">
+        <div class="stats-sidebar">
+            <div class="period-selector">
+                <button class="period-btn active" data-period="day">日</button>
+                <button class="period-btn" data-period="week">周</button>
+                <button class="period-btn" data-period="month">月</button>
+                <button class="period-btn" data-period="all">全部</button>
+            </div>
+            <div class="mini-cal" id="miniCalendar"></div>
+            <div class="selected-range" id="selectedRange"></div>
+        </div>
+        <div class="stats-content">
+            <div class="summary-cards" id="summaryCards">
+                <div class="summary-card"><div class="sc-icon">📋</div><div class="sc-value" id="scEvents">0</div><div class="sc-label">执行事项</div></div>
+                <div class="summary-card"><div class="sc-icon">📐</div><div class="sc-value" id="scPlannedHours">0h</div><div class="sc-label">执行时长</div></div>
+                <div class="summary-card"><div class="sc-icon">⏱️</div><div class="sc-value" id="scFocusTime">0h</div><div class="sc-label">专注时长</div></div>
+                <div class="summary-card"><div class="sc-icon">🎯</div><div class="sc-value" id="scTimerRate">0%</div><div class="sc-label">计时完成率</div></div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-card"><h4>执行趋势</h4><div class="chart-wrap"><canvas id="chartSchedule"></canvas></div></div>
+                <div class="chart-card"><h4>分类分布</h4><div class="chart-wrap"><canvas id="chartCategory"></canvas></div></div>
+                <div class="chart-card"><h4>专注趋势</h4><div class="chart-wrap"><canvas id="chartFocus"></canvas></div></div>
+                <div class="chart-card"><h4>优先级分布</h4><div class="chart-wrap"><canvas id="chartPriority"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+</div>

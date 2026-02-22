@@ -61,16 +61,40 @@ SQLite 数据库文件 `planner.db` 会在首次运行时自动创建。
 
 ```
 schedule_planner/
-├── app.py                 # Flask 后端 & REST API
+├── app.py                 # Flask 入口
+├── config.py              # 应用配置
+├── database.py            # 数据库连接与表结构初始化
+├── routes/                # Flask 蓝图（Blueprint）
+│   ├── __init__.py        # 蓝图注册
+│   ├── main.py            # 页面路由 (/)
+│   ├── events.py          # 日程事件 CRUD API
+│   ├── timer.py           # 计时记录与统计 API
+│   ├── notes.py           # 笔记 API
+│   └── stats.py           # 统计与分析 API
 ├── planner.db             # SQLite 数据库（自动创建）
 ├── requirements.txt
 ├── templates/
-│   └── index.html         # 单页 HTML
+│   ├── index.html         # 主模板（组装各部分）
+│   └── partials/
+│       ├── schedule.html  # 日程安排表页面
+│       ├── timer.html     # 计时器页面
+│       ├── stats.html     # 数据统计页面
+│       └── modal.html     # 弹窗、气泡菜单与提示
 └── static/
     ├── css/
-    │   └── style.css      # 全部样式
+    │   ├── base.css       # 变量、重置、全局样式
+    │   ├── layout.css     # 顶栏、标签页、页面布局
+    │   ├── schedule.css   # 日程页面样式
+    │   ├── timer.css      # 计时器页面样式
+    │   ├── stats.css      # 统计页面样式
+    │   └── components.css # 弹窗、气泡菜单、提示、按钮
     └── js/
-        └── app.js         # 全部前端逻辑
+        ├── app.js         # 入口与标签页初始化
+        ├── constants.js   # 共享常量
+        ├── helpers.js     # 工具函数
+        ├── planner.js     # 日程安排（PlannerApp 类）
+        ├── timer.js       # 计时器（TimerManager 类）
+        └── stats.js       # 数据统计（StatisticsManager 类）
 ```
 
 ## API 接口

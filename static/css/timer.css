@@ -1,0 +1,165 @@
+/* ================================================================
+   TIMER PAGE
+   ================================================================ */
+.timer-page-inner { display: flex; flex: 1; overflow: hidden; }
+
+.timer-sidebar-left {
+    width: 270px;
+    flex-shrink: 0;
+    background: var(--bg-primary);
+    border-right: 1px solid var(--border-color);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+}
+
+.timer-date-label {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    padding: 2px 0 0;
+}
+
+/* Timer calendar */
+.timer-cal { user-select: none; }
+.timer-cal .cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 10px; }
+.timer-cal .cal-nav span { font-size: 14px; font-weight: 700; }
+.timer-cal .cal-nav button {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border-color); background: var(--bg-primary);
+    border-radius: var(--radius-sm); font-size: 15px; cursor: pointer;
+    color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+}
+.timer-cal .cal-nav button:hover { background: var(--bg-secondary); color: var(--accent); }
+.timer-cal .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding-bottom: 6px; }
+.timer-cal .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.timer-cal .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; cursor: pointer; border-radius: 50%;
+    transition: all 0.1s; color: var(--text-primary);
+}
+.timer-cal .cal-day:hover { background: var(--bg-secondary); }
+.timer-cal .cal-day.other-month { color: var(--text-muted); }
+.timer-cal .cal-day.today { font-weight: 800; color: var(--accent); }
+.timer-cal .cal-day.selected { background: var(--accent); color: white !important; font-weight: 700; }
+.timer-cal .today-btn {
+    display: block; width: 100%; padding: 6px 0; margin-top: 8px;
+    border: 1px solid var(--border-color); background: var(--bg-primary);
+    border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+    cursor: pointer; color: var(--text-secondary); transition: all 0.15s; font-family: inherit;
+}
+.timer-cal .today-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+.timer-main {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px; gap: 20px; min-width: 0;
+}
+
+.timer-task-input {
+    width: 360px; max-width: 90%;
+    padding: 12px 18px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 16px; font-family: inherit;
+    text-align: center; background: var(--bg-primary);
+    color: var(--text-primary); transition: border-color 0.15s;
+}
+.timer-task-input:focus { outline: none; border-color: var(--accent); }
+.timer-task-input.running { border-color: transparent; background: transparent; font-weight: 600; color: var(--text-secondary); pointer-events: none; }
+
+.timer-ring-wrap { position: relative; width: 280px; height: 280px; }
+.timer-ring { display: block; }
+.timer-ring-progress { transition: stroke-dashoffset 0.3s ease; }
+.timer-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.timer-display { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); letter-spacing: 2px; }
+.timer-display.paused { animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.timer-state-label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-top: 4px; }
+
+.timer-adjuster { display: flex; gap: 14px; margin-bottom: 6px; }
+.adj-btn {
+    width: 64px; height: 42px;
+    border: 1.5px solid var(--accent-light);
+    background: var(--accent-bg); border-radius: var(--radius-md);
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    color: var(--accent); transition: all 0.15s; font-family: inherit;
+}
+.adj-btn:hover { border-color: var(--accent); background: var(--accent); color: white; }
+
+.timer-presets { display: flex; gap: 10px; }
+.preset-btn {
+    padding: 9px 20px;
+    border: 1.5px solid var(--accent-light);
+    background: var(--accent-bg); border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    color: var(--accent); transition: all 0.15s; font-family: inherit;
+}
+.preset-btn:hover { border-color: var(--accent); background: var(--accent); color: white; }
+.preset-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.timer-start-btn {
+    padding: 14px 56px; border: none;
+    background: var(--accent); color: white;
+    border-radius: 28px; font-size: 17px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    font-family: inherit; margin-top: 8px;
+}
+.timer-start-btn:hover { background: #5b4bd5; transform: scale(1.03); }
+
+.timer-controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.ctrl-btn {
+    padding: 10px 24px;
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-primary); border-radius: 20px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; font-family: inherit; color: var(--text-secondary);
+}
+.ctrl-btn:hover { border-color: var(--accent-light); color: var(--accent); background: var(--accent-bg); }
+.ctrl-pause { color: var(--accent); border-color: var(--accent-light); }
+.ctrl-stop { color: var(--danger); border-color: var(--danger); }
+.ctrl-stop:hover { background: var(--danger); color: white; }
+
+.timer-stats-card, .timer-records-card { padding: 16px; border-bottom: 1px solid var(--border-light); }
+.timer-stats-card h3, .timer-records-card h3 {
+    font-size: 13px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+}
+.timer-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ts-item { text-align: center; padding: 10px 4px; background: var(--bg-secondary); border-radius: var(--radius-sm); }
+.ts-value { font-size: 18px; font-weight: 700; color: var(--accent); }
+.ts-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.timer-records-card { flex: 1; display: flex; flex-direction: column; }
+.timer-records-list { flex: 1; overflow-y: auto; }
+.timer-records-empty { text-align: center; color: var(--text-muted); padding: 30px 0; font-size: 13px; }
+.timer-record { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); gap: 10px; }
+.timer-record:last-child { border-bottom: none; }
+.tr-status { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.tr-status.done { background: var(--success-light); color: var(--success); }
+.tr-status.stopped { background: var(--danger-light); color: var(--danger); }
+.tr-info { flex: 1; min-width: 0; }
+.tr-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-meta { font-size: 11px; color: var(--text-muted); }
+.tr-delete {
+    width: 24px; height: 24px; border: none; background: none;
+    color: var(--text-muted); cursor: pointer; border-radius: 4px;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: all 0.15s;
+}
+.timer-record:hover .tr-delete { opacity: 1; }
+.tr-delete:hover { background: var(--danger-light); color: var(--danger); }
+
+.timer-ring-wrap.completed .timer-ring-progress { stroke: var(--success) !important; }
+
+@media (max-width: 900px) {
+    .timer-page-inner { flex-direction: column; }
+    .timer-sidebar-left { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); flex-direction: row; flex-wrap: wrap; }
+    .timer-sidebar-left .timer-cal { flex: 1; min-width: 220px; }
+    .timer-sidebar-left .timer-stats-card { flex: 1; min-width: 180px; }
+}

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日程规划器</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <nav class="top-bar">
+            <h1 class="logo">📅 日程规划器</h1>
+            <div class="tab-nav">
+                <button class="tab active" data-page="schedule">📋 日程安排表</button>
+                <button class="tab" data-page="timer">
+                    ⏱️ 计时器
+                    <span class="timer-badge" id="timerBadge"></span>
+                </button>
+                <button class="tab" data-page="stats">📊 数据统计</button>
+            </div>
+            <div class="top-bar-spacer"></div>
+        </nav>
+
+        <!-- ========== Schedule Page ========== -->
+        <div class="page active" id="schedulePage">
+            <div class="schedule-page-inner">
+                <div class="schedule-sidebar">
+                    <div class="schedule-cal" id="scheduleCal"></div>
+                    <div class="schedule-date-label" id="scheduleDateLabel"></div>
+                    <div class="schedule-stats">
+                        <div class="ss-row"><span class="ss-label">事项</span><span class="ss-val" id="statTotal">0</span></div>
+                        <div class="ss-row"><span class="ss-label">已完成</span><span class="ss-val" id="statCompleted">0</span></div>
+                        <div class="ss-row"><span class="ss-label">计划时长</span><span class="ss-val" id="statHours">0h</span></div>
+                        <div class="ss-row"><span class="ss-label">完成率</span><span class="ss-val" id="statRate">0%</span></div>
+                    </div>
+                </div>
+                <div class="schedule-main">
+                    <div class="schedule-grid-panel">
+                        <div class="schedule-col-headers">
+                            <div class="col-header-gutter"></div>
+                            <div class="col-header plan-header">计划</div>
+                            <div class="col-header actual-header">实际执行</div>
+                        </div>
+                        <div class="schedule-grid" id="scheduleGrid"></div>
+                    </div>
+                    <div class="notes-panel">
+                        <div class="notes-header">
+                            <span class="notes-title">📝 笔记</span>
+                            <div class="notes-tabs">
+                                <button class="notes-tab active" data-mode="edit">编辑</button>
+                                <button class="notes-tab" data-mode="preview">预览</button>
+                            </div>
+                        </div>
+                        <div class="notes-body">
+                            <textarea id="notesEditor" class="notes-editor" placeholder="在这里写笔记...&#10;&#10;支持 Markdown + LaTeX：&#10;# 标题&#10;**加粗** *斜体*&#10;- 列表项&#10;> 引用&#10;`代码`&#10;$E=mc^2$ 行内公式&#10;$$ \int_0^\infty e^{-x} dx $$ 块级公式"></textarea>
+                            <div id="notesPreview" class="notes-preview markdown-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Timer Page ========== -->
+        <div class="page" id="timerPage">
+            <div class="timer-page-inner">
+                <div class="timer-sidebar-left">
+                    <div class="timer-cal" id="timerCal"></div>
+                    <div class="timer-date-label" id="timerDateLabel"></div>
+                    <div class="timer-stats-card">
+                        <h3>专注统计</h3>
+                        <div class="timer-stats-grid">
+                            <div class="ts-item"><div class="ts-value" id="tsFocusTime">0分钟</div><div class="ts-label">总专注</div></div>
+                            <div class="ts-item"><div class="ts-value" id="tsTaskCount">0</div><div class="ts-label">任务数</div></div>
+                            <div class="ts-item"><div class="ts-value" id="tsCompleted">0</div><div class="ts-label">已完成</div></div>
+                        </div>
+                    </div>
+                    <div class="timer-records-card">
+                        <h3>条目记录</h3>
+                        <div class="timer-records-list" id="timerRecordsList">
+                            <div class="timer-records-empty">暂无记录</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="timer-main">
+                    <div class="timer-setup" id="timerSetup">
+                        <input type="text" class="timer-task-input" id="timerTaskName"
+                               placeholder="输入任务名称..." maxlength="60">
+                        <div class="timer-ring-wrap">
+                            <svg class="timer-ring" width="280" height="280" viewBox="0 0 280 280">
+                                <circle cx="140" cy="140" r="126" fill="none" stroke="var(--border-color)" stroke-width="7" />
+                                <circle class="timer-ring-progress" cx="140" cy="140" r="126"
+                                        fill="none" stroke="var(--accent)" stroke-width="7"
+                                        stroke-dasharray="791.681" stroke-dashoffset="0"
+                                        transform="rotate(-90 140 140)" stroke-linecap="round" />
+                            </svg>
+                            <div class="timer-ring-center">
+                                <div class="timer-display" id="timerDisplay">25:00</div>
+                                <div class="timer-state-label" id="timerStateLabel">准备开始</div>
+                            </div>
+                        </div>
+                        <div class="timer-adjuster">
+                            <button class="adj-btn" id="timerMinus5">−5</button>
+                            <button class="adj-btn" id="timerPlus5">+5</button>
+                        </div>
+                        <div class="timer-presets">
+                            <button class="preset-btn" data-min="15">15分</button>
+                            <button class="preset-btn active" data-min="25">25分</button>
+                            <button class="preset-btn" data-min="45">45分</button>
+                            <button class="preset-btn" data-min="60">60分</button>
+                        </div>
+                        <button class="timer-start-btn" id="timerStartBtn">▶ 开始专注</button>
+                    </div>
+                    <div class="timer-controls" id="timerControls" style="display:none">
+                        <button class="ctrl-btn ctrl-pause" id="timerPauseBtn">⏸ 暂停</button>
+                        <button class="ctrl-btn ctrl-add" id="timerAdd5">+5分</button>
+                        <button class="ctrl-btn ctrl-add" id="timerAdd30">+30分</button>
+                        <button class="ctrl-btn ctrl-stop" id="timerStopBtn">⏹ 停止</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Statistics Page ========== -->
+        <div class="page" id="statsPage">
+            <div class="stats-page-inner">
+                <div class="stats-sidebar">
+                    <div class="period-selector">
+                        <button class="period-btn active" data-period="day">日</button>
+                        <button class="period-btn" data-period="week">周</button>
+                        <button class="period-btn" data-period="month">月</button>
+                        <button class="period-btn" data-period="all">全部</button>
+                    </div>
+                    <div class="mini-cal" id="miniCalendar"></div>
+                    <div class="selected-range" id="selectedRange"></div>
+                </div>
+                <div class="stats-content">
+                    <div class="summary-cards" id="summaryCards">
+                        <div class="summary-card"><div class="sc-icon">📋</div><div class="sc-value" id="scEvents">0</div><div class="sc-label">执行事项</div></div>
+                        <div class="summary-card"><div class="sc-icon">📐</div><div class="sc-value" id="scPlannedHours">0h</div><div class="sc-label">执行时长</div></div>
+                        <div class="summary-card"><div class="sc-icon">⏱️</div><div class="sc-value" id="scFocusTime">0h</div><div class="sc-label">专注时长</div></div>
+                        <div class="summary-card"><div class="sc-icon">🎯</div><div class="sc-value" id="scTimerRate">0%</div><div class="sc-label">计时完成率</div></div>
+                    </div>
+                    <div class="charts-grid">
+                        <div class="chart-card"><h4>执行趋势</h4><div class="chart-wrap"><canvas id="chartSchedule"></canvas></div></div>
+                        <div class="chart-card"><h4>分类分布</h4><div class="chart-wrap"><canvas id="chartCategory"></canvas></div></div>
+                        <div class="chart-card"><h4>专注趋势</h4><div class="chart-wrap"><canvas id="chartFocus"></canvas></div></div>
+                        <div class="chart-card"><h4>优先级分布</h4><div class="chart-wrap"><canvas id="chartPriority"></canvas></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="eventModal">
+            <div class="modal-header">
+                <h3 id="modalTitle">新建日程</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="eventTitle">标题 <span class="required">*</span></label>
+                    <input type="text" id="eventTitle" placeholder="要做什么？" maxlength="100">
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label for="eventDate">日期</label><input type="date" id="eventDate"></div>
+                    <div class="form-group"><label for="eventStart">开始</label><select id="eventStart"></select></div>
+                    <div class="form-group"><label for="eventEnd">结束</label><select id="eventEnd"></select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="eventCategory">分类</label>
+                        <select id="eventCategory">
+                            <option value="工作" selected>💼 工作</option>
+                            <option value="学习">📚 学习</option>
+                            <option value="个人">👤 个人</option>
+                            <option value="运动">🏃 运动</option>
+                            <option value="其他">📌 其他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="eventPriority">优先级</label>
+                        <select id="eventPriority">
+                            <option value="1" selected>🔴 高</option>
+                            <option value="2">🟡 中</option>
+                            <option value="3">🟢 低</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label>颜色</label><div class="color-picker" id="colorPicker"></div></div>
+                <div class="form-group"><label for="eventDescription">备注</label><textarea id="eventDescription" placeholder="添加备注..." rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-left"><button class="btn btn-danger" id="deleteBtn" style="display:none">删除</button></div>
+                <div class="modal-footer-right">
+                    <button class="btn btn-secondary" id="cancelBtn">取消</button>
+                    <button class="btn btn-success" id="completeBtn" style="display:none">✓ 完成</button>
+                    <button class="btn btn-primary" id="saveBtn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="popover" id="actionPopover">
+        <button class="popover-btn" id="popoverEdit"><span class="popover-icon">✏️</span> 编辑</button>
+        <button class="popover-btn" id="popoverComplete"><span class="popover-icon">✓</span> 完成</button>
+        <button class="popover-btn popover-btn-danger" id="popoverDelete"><span class="popover-icon">🗑️</span> 删除</button>
+    </div>
+
+    <div class="toast" id="toast">
+        <span class="toast-message" id="toastMessage"></span>
+        <button class="toast-action" id="toastAction" style="display:none">撤销</button>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -46,9 +46,10 @@ def before_request():
     g.request_start = time.monotonic()
 
     if request.method in ("POST", "PUT", "DELETE") and request.path.startswith("/api/"):
-        ct = request.content_type or ""
-        if "application/json" not in ct and "multipart/form-data" not in ct:
-            return jsonify({"error": "不支持的请求格式"}), 415
+        if request.method in ("POST", "PUT") and request.content_length:
+            ct = request.content_type or ""
+            if "application/json" not in ct and "multipart/form-data" not in ct:
+                return jsonify({"error": "不支持的请求格式"}), 415
 
         origin = request.headers.get("Origin") or ""
         referer = request.headers.get("Referer") or ""
@@ -189,4 +190,28 @@ signal.signal(signal.SIGTERM, lambda *a: (_graceful_shutdown(), exit(0)))
 
 if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("true", "1")
-    app.run(debug=debug, port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5555))
+    host = os.environ.get("HOST", "127.0.0.1")
+
+    if debug:
+        app.run(debug=True, host=host, port=port)
+    else:
+        try:
+            from waitress import serve
+            logger.info("使用 waitress 生产服务器启动 (http://%s:%s)", host, port)
+            serve(app, host=host, port=port, threads=8)
+        except ImportError:
+            try:
+                import gunicorn  # noqa: F401
+                import subprocess, sys
+                logger.info("使用 gunicorn 生产服务器启动")
+                subprocess.run([
+                    sys.executable, "-m", "gunicorn",
+                    "--bind", f"{host}:{port}",
+                    "--workers", "4",
+                    "--access-logfile", "-",
+                    "app:app",
+                ])
+            except ImportError:
+                logger.warning("未安装生产 WSGI 服务器 (waitress/gunicorn)，回退到 Flask 开发服务器")
+                app.run(host=host, port=port)

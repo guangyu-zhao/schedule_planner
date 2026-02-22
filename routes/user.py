@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -12,6 +13,8 @@ from config import ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE
 from database import get_db
 from auth_utils import login_required
 from storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 user_bp = Blueprint("user", __name__)
 
@@ -117,9 +120,13 @@ def upload_avatar():
         buf = io.BytesIO()
         img.save(buf, format="JPEG" if ext == "jpg" else ext.upper(), quality=90)
         storage.save(buf.getvalue(), relative_path)
-    except Exception:
+    except ImportError:
+        # Pillow 未安装，直接存储原始文件
         file.stream.seek(0)
         storage.save(file.stream, relative_path)
+    except Exception as e:
+        logger.warning("头像图片处理失败: %s", e)
+        return jsonify({"error": "图片处理失败，请上传有效的图片文件"}), 400
 
     conn = get_db()
     old = conn.execute(

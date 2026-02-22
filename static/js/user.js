@@ -17,6 +17,16 @@ async function loadCurrentUser() {
         currentUser = data.user;
         if (currentUser && currentUser.language && window.I18n && window.I18n.setLanguage) {
             window.I18n.setLanguage(currentUser.language);
+            if (window.I18n.t) document.title = window.I18n.t('app.title');
+            if (window.planner && window.planner.renderCalendar) window.planner.renderCalendar();
+            if (window.timer) {
+                window.timer.renderCalendar();
+                window.timer.originalTitle = document.title;
+            }
+            if (window.stats) {
+                window.stats.renderCalendar();
+                window.stats.updateRangeLabel();
+            }
         }
         updateUserUI();
     } catch { /* ignore */ }

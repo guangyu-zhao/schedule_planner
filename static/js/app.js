@@ -22,7 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (window.I18n) {
         if (window.I18n.applyTranslations) window.I18n.applyTranslations();
-        if (window.I18n.t) document.title = window.I18n.t('app.title');
+        if (window.I18n.t) {
+            document.title = window.I18n.t('app.title');
+            if (window.timer) window.timer.originalTitle = document.title;
+        }
     }
 
     document.addEventListener('visibilitychange', () => {

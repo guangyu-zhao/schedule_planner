@@ -366,22 +366,72 @@ def empty_trash():
     return jsonify({"success": True})
 
 
+@events_bp.route("/api/events/dates", methods=["GET"])
+@login_required
+def events_dates():
+    """Return distinct dates that have at least one event, within a date range."""
+    start = request.args.get("start", "")
+    end   = request.args.get("end",   "")
+    if not DATE_RE.match(start) or not DATE_RE.match(end):
+        return jsonify([])
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DISTINCT date FROM events WHERE user_id=? AND date BETWEEN ? AND ? ORDER BY date",
+        (g.user_id, start, end),
+    ).fetchall()
+    return jsonify([r["date"] for r in rows])
+
+
 @events_bp.route("/api/events/search", methods=["GET"])
 @login_required
 def search_events():
     """Search events by keyword in title/description."""
     q = (request.args.get("q") or "").strip()
-    if not q or len(q) < 1:
+    if not q:
         return jsonify([])
     try:
         limit = min(int(request.args.get("limit", 50)), 200)
     except (ValueError, TypeError):
         limit = 50
+    case_sensitive = request.args.get("case_sensitive") == "1"
+    whole_word     = request.args.get("whole_word")     == "1"
+    use_regex      = request.args.get("regex")          == "1"
     conn = get_db()
-    keyword = f"%{q.replace('%', '').replace('_', '')}%"
-    events = conn.execute(
-        """SELECT * FROM events WHERE user_id=? AND (title LIKE ? OR description LIKE ?)
+
+    if use_regex:
+        try:
+            flags = 0 if case_sensitive else re.IGNORECASE
+            pattern = re.compile(q, flags)
+        except re.error as exc:
+            return jsonify({"error": str(exc)}), 400
+        rows = conn.execute(
+            "SELECT * FROM events WHERE user_id=? ORDER BY date DESC, start_time",
+            (g.user_id,),
+        ).fetchall()
+        def _match(r):
+            return pattern.search(r["title"] or "") or pattern.search(r["description"] or "")
+        return jsonify([dict(r) for r in rows if _match(r)][:limit])
+
+    # Non-regex: use LIKE for initial broad filter, then Python-refine
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    keyword = f"%{escaped}%"
+    fetch_limit = limit * 5 if (case_sensitive or whole_word) else limit
+    rows = conn.execute(
+        """SELECT * FROM events WHERE user_id=?
+           AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
            ORDER BY date DESC, start_time LIMIT ?""",
-        (g.user_id, keyword, keyword, limit),
+        (g.user_id, keyword, keyword, fetch_limit),
     ).fetchall()
-    return jsonify([dict(e) for e in events])
+
+    if whole_word:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        pattern = re.compile(r"\b" + re.escape(q) + r"\b", flags)
+        events = [dict(r) for r in rows
+                  if pattern.search(r["title"] or "") or pattern.search(r["description"] or "")]
+    elif case_sensitive:
+        events = [dict(r) for r in rows
+                  if q in (r["title"] or "") or q in (r["description"] or "")]
+    else:
+        events = [dict(r) for r in rows]
+
+    return jsonify(events[:limit])

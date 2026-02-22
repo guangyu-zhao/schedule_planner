@@ -1,4 +1,4 @@
-const CACHE_NAME = 'schedule-planner-v1';
+const CACHE_NAME = 'schedule-planner-v5';
 const STATIC_ASSETS = [
     '/',
     '/static/css/base.css',

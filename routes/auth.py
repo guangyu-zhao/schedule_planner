@@ -200,9 +200,9 @@ def forgot_password():
     store_verification_code(email, code, "reset_password")
     sent = send_verification_email(email, code)
     if not sent:
-        return jsonify({"error": "验证码发送失败，请稍后重试"}), 500
+        logger.error("向 %s 发送验证码失败", email)
 
-    return jsonify({"success": True, "message": "验证码已发送到您的邮箱"})
+    return jsonify({"success": True, "message": "如果该邮箱已注册，验证码已发送"})
 
 
 @auth_bp.route("/api/auth/verify-code", methods=["POST"])

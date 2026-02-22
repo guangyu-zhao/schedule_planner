@@ -175,7 +175,10 @@
                 sel.value = current || 'en';
                 I18n.setLanguage(sel.value);
             }
-            if (window.I18n) I18n.applyTranslations();
+            if (window.I18n) {
+                I18n.applyTranslations();
+                document.title = I18n.t('app.title.login');
+            }
         })();
         function changeAuthLanguage(code) {
             if (window.I18n) {

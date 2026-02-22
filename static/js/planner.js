@@ -40,6 +40,14 @@ export class PlannerApp {
 
         this.reminderTimers = [];
         this.notifiedEventIds = new Set();
+        this._searchTimer = null;
+        this._pendingHighlightId = null;
+        this._markerCacheMonth = null;
+        this._markerCacheEvents = new Set();
+        this._markerCacheNotes = new Set();
+        this._searchCase = false;
+        this._searchWord = false;
+        this._searchRegex = false;
 
         this.init();
     }
@@ -125,6 +133,7 @@ export class PlannerApp {
         });
 
         this.updateDateLabel();
+        this.fetchCalendarMarkers();
     }
 
     updateDateLabel() {
@@ -217,6 +226,15 @@ export class PlannerApp {
             });
 
             col.appendChild(el);
+
+            if (this._pendingHighlightId === evt.id) {
+                this._pendingHighlightId = null;
+                requestAnimationFrame(() => {
+                    el.classList.add('event-highlight');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    el.addEventListener('animationend', () => el.classList.remove('event-highlight'), { once: true });
+                });
+            }
         }
         this.updateTimeIndicator();
         this.scheduleReminders();
@@ -346,6 +364,8 @@ export class PlannerApp {
             const result = await r.json();
             if (result.event) this.events.push(result.event);
             this.renderEvents();
+            this._markerCacheMonth = null;
+            this.fetchCalendarMarkers();
             return result;
         } catch (e) {
             console.error(e);
@@ -371,6 +391,8 @@ export class PlannerApp {
             const idx = this.events.findIndex(e => e.id === id);
             if (idx !== -1) this.events[idx] = u;
             this.renderEvents();
+            this._markerCacheMonth = null;
+            this.fetchCalendarMarkers();
             return u;
         } catch (e) {
             console.error(e);
@@ -391,6 +413,8 @@ export class PlannerApp {
             const data = await r.json();
             this.events = this.events.filter(e => e.id !== id);
             this.renderEvents();
+            this._markerCacheMonth = null;
+            this.fetchCalendarMarkers();
             return data.event;
         } catch (e) {
             console.error(e);
@@ -707,6 +731,26 @@ export class PlannerApp {
         return COLORS[used.length % COLORS.length];
     }
 
+    _populateModalSelects() {
+        const t = key => (window.I18n && window.I18n.t) ? window.I18n.t(key) : key;
+        const categories = [
+            { value: '工作', icon: '💼', key: 'category.work' },
+            { value: '学习', icon: '📚', key: 'category.study' },
+            { value: '个人', icon: '👤', key: 'category.personal' },
+            { value: '运动', icon: '🏃', key: 'category.exercise' },
+            { value: '其他', icon: '📌', key: 'category.other' },
+        ];
+        const priorities = [
+            { value: '1', icon: '🔴', key: 'priority.high' },
+            { value: '2', icon: '🟡', key: 'priority.medium' },
+            { value: '3', icon: '🟢', key: 'priority.low' },
+        ];
+        document.getElementById('eventCategory').innerHTML =
+            categories.map(c => `<option value="${c.value}">${c.icon} ${escHtml(t(c.key))}</option>`).join('');
+        document.getElementById('eventPriority').innerHTML =
+            priorities.map(p => `<option value="${p.value}">${p.icon} ${escHtml(t(p.key))}</option>`).join('');
+    }
+
     showCreateModal(date, startTime, endTime) {
         this.editingEvent = null;
         this.selectedColor = this.getNextColor(date);
@@ -715,10 +759,10 @@ export class PlannerApp {
         document.getElementById('eventDate').value = date;
         document.getElementById('eventStart').value = startTime;
         document.getElementById('eventEnd').value = endTime;
+        this._populateModalSelects();
         document.getElementById('eventCategory').value = '工作';
         document.getElementById('eventPriority').value = '1';
         document.getElementById('eventDescription').value = '';
-        document.getElementById('eventRecur').value = '';
         document.getElementById('deleteBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'none';
         document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.save') : 'Save';
@@ -736,10 +780,10 @@ export class PlannerApp {
         document.getElementById('eventDate').value = event.date;
         document.getElementById('eventStart').value = event.start_time;
         document.getElementById('eventEnd').value = event.end_time;
+        this._populateModalSelects();
         document.getElementById('eventCategory').value = event.category;
         document.getElementById('eventPriority').value = String(event.priority);
         document.getElementById('eventDescription').value = event.description || '';
-        document.getElementById('eventRecur').value = event.recur_rule || '';
         document.getElementById('deleteBtn').style.display = 'inline-flex';
         document.getElementById('completeBtn').style.display = 'none';
         document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.update') : 'Update';
@@ -769,7 +813,6 @@ export class PlannerApp {
             priority: parseInt(document.getElementById('eventPriority').value),
             description: document.getElementById('eventDescription').value.trim(),
             completed: this.editingEvent ? this.editingEvent.completed : 0,
-            recur_rule: document.getElementById('eventRecur').value || null,
         };
         if (data.start_time >= data.end_time) {
             showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.startTimeError') : 'End time must be after start time');
@@ -933,6 +976,9 @@ export class PlannerApp {
         });
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
+                if (document.getElementById('searchDropdown').classList.contains('active')) {
+                    this._closeSearch(); return;
+                }
                 if (document.getElementById('actionPopover').classList.contains('active')) this.hidePopover();
                 else if (document.getElementById('modalOverlay').classList.contains('active')) this.closeModal();
                 return;
@@ -986,6 +1032,45 @@ export class PlannerApp {
                 this.editingColType = 'plan';
                 this.showCreateModal(this.selectedDateStr(), this.slotToTime(startSlot), this.slotToTime(endSlot));
             }
+        });
+
+        // Search
+        const searchInput = document.getElementById('searchInput');
+        const searchClearBtn = document.getElementById('searchClearBtn');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                const q = searchInput.value.trim();
+                searchClearBtn.style.display = q ? 'inline-block' : 'none';
+                this._onSearchInput(q);
+            });
+            searchInput.addEventListener('keydown', e => {
+                if (e.key === 'Escape') { e.stopPropagation(); this._closeSearch(); }
+            });
+        }
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', () => this._closeSearch());
+        }
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#scheduleSearchBar')) this._closeSearchDropdown();
+        });
+
+        const toggleMap = [
+            ['searchCaseBtn',  () => { this._searchCase  = !this._searchCase;  }],
+            ['searchWordBtn',  () => { this._searchWord  = !this._searchWord;  }],
+            ['searchRegexBtn', () => {
+                this._searchRegex = !this._searchRegex;
+                if (!this._searchRegex) document.getElementById('searchInput')?.classList.remove('regex-error');
+            }],
+        ];
+        toggleMap.forEach(([id, toggle]) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                toggle();
+                btn.classList.toggle('active');
+                const q = document.getElementById('searchInput')?.value.trim();
+                if (q) this._performSearch(q);
+            });
         });
     }
 
@@ -1158,6 +1243,8 @@ export class PlannerApp {
                     return;
                 }
                 this.updateSaveIndicator('saved');
+                this._markerCacheMonth = null;
+                this.fetchCalendarMarkers();
             } catch (e) {
                 console.error(e);
                 this.updateSaveIndicator('');
@@ -1213,6 +1300,136 @@ export class PlannerApp {
         } else {
             preview.textContent = this.noteContent;
         }
+    }
+
+    _onSearchInput(q) {
+        clearTimeout(this._searchTimer);
+        if (!q) { this._closeSearchDropdown(); return; }
+        this._searchTimer = setTimeout(() => this._performSearch(q), 300);
+    }
+
+    async _performSearch(q) {
+        const inp = document.getElementById('searchInput');
+        try {
+            const params = new URLSearchParams({
+                q, limit: 15,
+                case_sensitive: this._searchCase  ? '1' : '0',
+                whole_word:     this._searchWord  ? '1' : '0',
+                regex:          this._searchRegex ? '1' : '0',
+            });
+            const [evtRes, noteRes] = await Promise.all([
+                fetch(`/api/events/search?${params}`),
+                fetch(`/api/notes/search?${params}`),
+            ]);
+            if (!evtRes.ok) {
+                const err = await evtRes.json().catch(() => ({}));
+                inp?.classList.add('regex-error');
+                this._renderSearchDropdown([], err.error);
+                return;
+            }
+            inp?.classList.remove('regex-error');
+            const events = (await evtRes.json()).map(e => ({ ...e, _type: 'event' }));
+            const notes  = noteRes.ok ? (await noteRes.json()).map(n => ({ ...n, _type: 'note' })) : [];
+            const combined = [...events, ...notes].sort((a, b) => b.date.localeCompare(a.date));
+            this._renderSearchDropdown(combined);
+        } catch (e) { /* network error: silently ignore */ }
+    }
+
+    _renderSearchDropdown(results, errorMsg) {
+        const dropdown = document.getElementById('searchDropdown');
+        const t = key => (window.I18n && window.I18n.t) ? window.I18n.t(key) : key;
+        if (errorMsg) {
+            dropdown.innerHTML = `<div class="search-no-results search-error">${escHtml(errorMsg)}</div>`;
+            dropdown.classList.add('active');
+            return;
+        }
+        if (!results.length) {
+            dropdown.innerHTML = `<div class="search-no-results">${escHtml(t('schedule.noResults'))}</div>`;
+        } else {
+            dropdown.innerHTML = results.map(item => {
+                if (item._type === 'note') {
+                    const snippet = item.content.replace(/[#*`>_~\[\]!]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+                    return `<div class="search-result-item" data-type="note" data-date="${escHtml(item.date)}">
+                        <span class="search-result-note-icon">&#128221;</span>
+                        <span class="search-result-title">${escHtml(snippet || item.date)}</span>
+                        <span class="search-result-meta">${escHtml(item.date)}</span>
+                    </div>`;
+                }
+                return `<div class="search-result-item" data-type="event" data-event-id="${item.id}" data-date="${escHtml(item.date)}">
+                    <span class="search-result-dot" style="background:${escHtml(item.color)}"></span>
+                    <span class="search-result-title">${escHtml(item.title)}</span>
+                    <span class="search-result-meta">${escHtml(item.date)} ${escHtml(item.start_time)}-${escHtml(item.end_time)}</span>
+                </div>`;
+            }).join('');
+            dropdown.querySelectorAll('.search-result-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const date = el.dataset.date;
+                    this._closeSearch();
+                    if (el.dataset.type === 'note') {
+                        this._jumpToDate(date, null);
+                    } else {
+                        this._jumpToDate(date, parseInt(el.dataset.eventId, 10));
+                    }
+                });
+            });
+        }
+        dropdown.classList.add('active');
+    }
+
+    _closeSearchDropdown() {
+        document.getElementById('searchDropdown')?.classList.remove('active');
+    }
+
+    _closeSearch() {
+        const inp = document.getElementById('searchInput');
+        const btn = document.getElementById('searchClearBtn');
+        if (inp) { inp.value = ''; inp.classList.remove('regex-error'); }
+        if (btn) btn.style.display = 'none';
+        this._closeSearchDropdown();
+    }
+
+    _jumpToDate(dateStr, highlightEventId) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        this.selectedDate = new Date(y, m - 1, d);
+        this._pendingHighlightId = highlightEventId;
+        this.onDateChange();
+    }
+
+    async fetchCalendarMarkers() {
+        const year  = this.calendarMonth.getFullYear();
+        const month = this.calendarMonth.getMonth();
+        const cacheKey = `${year}-${month}`;
+        if (this._markerCacheMonth === cacheKey) {
+            this._applyCalendarMarkers();
+            return;
+        }
+        const start = fmtDateISO(new Date(year, month, 1));
+        const end   = fmtDateISO(new Date(year, month + 1, 0));
+        try {
+            const [evtRes, noteRes] = await Promise.all([
+                fetch(`/api/events/dates?start=${start}&end=${end}`),
+                fetch(`/api/notes/dates?start=${start}&end=${end}`),
+            ]);
+            this._markerCacheEvents = new Set(evtRes.ok  ? await evtRes.json()  : []);
+            this._markerCacheNotes  = new Set(noteRes.ok ? await noteRes.json() : []);
+            this._markerCacheMonth  = cacheKey;
+            this._applyCalendarMarkers();
+        } catch (e) { /* ignore */ }
+    }
+
+    _applyCalendarMarkers() {
+        document.querySelectorAll('#scheduleCal .cal-day').forEach(el => {
+            el.querySelectorAll('.cal-markers').forEach(m => m.remove());
+            const ds = el.dataset.date;
+            const hasEvent = this._markerCacheEvents.has(ds);
+            const hasNote  = this._markerCacheNotes.has(ds);
+            if (!hasEvent && !hasNote) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'cal-markers';
+            if (hasEvent) wrap.insertAdjacentHTML('beforeend', '<span class="cal-marker cal-marker-event"></span>');
+            if (hasNote)  wrap.insertAdjacentHTML('beforeend', '<span class="cal-marker cal-marker-note"></span>');
+            el.appendChild(wrap);
+        });
     }
 
     hexToRgba(hex, a) { return `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`; }

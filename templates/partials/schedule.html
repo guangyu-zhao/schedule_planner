@@ -6,6 +6,20 @@
         </div>
         <div class="schedule-main">
             <div class="schedule-grid-panel">
+                <div class="schedule-search-bar" id="scheduleSearchBar">
+                    <span class="search-icon">&#9906;</span>
+                    <input type="text" id="searchInput" class="search-input"
+                           autocomplete="off"
+                           data-i18n-placeholder="schedule.searchPlaceholder"
+                           placeholder="Search events...">
+                    <button class="search-clear-btn" id="searchClearBtn" style="display:none">&#x2715;</button>
+                    <div class="search-toggles">
+                        <button class="search-toggle-btn" id="searchCaseBtn" data-i18n-title="search.caseSensitive" title="Case sensitive">Aa</button>
+                        <button class="search-toggle-btn" id="searchWordBtn" data-i18n-title="search.wholeWord" title="Whole word">\b</button>
+                        <button class="search-toggle-btn" id="searchRegexBtn" data-i18n-title="search.useRegex" title="Use regular expression">.*</button>
+                    </div>
+                    <div class="search-dropdown" id="searchDropdown"></div>
+                </div>
                 <div class="schedule-col-headers">
                     <div class="col-header-gutter"></div>
                     <div class="col-header plan-header" data-i18n="schedule.plan">Plan</div>

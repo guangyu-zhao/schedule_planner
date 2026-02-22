@@ -204,7 +204,7 @@ def delete_event(event_id):
 @events_bp.route("/api/events/<int:event_id>/duplicate", methods=["POST"])
 @login_required
 def duplicate_event(event_id):
-    """Copy an event (and its linked counterpart) to a target date."""
+    """Copy a single event to a target date."""
     data = request.json or {}
     target_date = data.get("target_date", "")
     if not DATE_RE.match(target_date):
@@ -218,41 +218,18 @@ def duplicate_event(event_id):
         return jsonify({"error": "事件不存在"}), 404
 
     src = dict(event)
-    col_type = src.get("col_type", "plan")
-
-    if col_type == "actual" and src.get("link_id"):
-        plan = conn.execute(
-            "SELECT * FROM events WHERE id=? AND user_id=?", (src["link_id"], g.user_id)
-        ).fetchone()
-        if plan:
-            src = dict(plan)
-            col_type = "plan"
-
     cursor = conn.execute(
         """INSERT INTO events (user_id, title, description, date, start_time, end_time,
            color, category, priority, col_type)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (g.user_id, src["title"], src.get("description", ""), target_date,
          src["start_time"], src["end_time"], src["color"],
-         src.get("category", "其他"), src.get("priority", 2), "plan"),
+         src.get("category", "其他"), src.get("priority", 2), src.get("col_type", "plan")),
     )
-    plan_id = cursor.lastrowid
-
-    cursor2 = conn.execute(
-        """INSERT INTO events (user_id, title, description, date, start_time, end_time,
-           color, category, priority, col_type, link_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'actual', ?)""",
-        (g.user_id, src["title"], src.get("description", ""), target_date,
-         src["start_time"], src["end_time"], src["color"],
-         src.get("category", "其他"), src.get("priority", 2), plan_id),
-    )
-    actual_id = cursor2.lastrowid
-    conn.execute("UPDATE events SET link_id=? WHERE id=?", (actual_id, plan_id))
     conn.commit()
 
-    plan_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (plan_id,)).fetchone())
-    actual_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (actual_id,)).fetchone())
-    return jsonify({"plan": plan_event, "actual": actual_event}), 201
+    new_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (cursor.lastrowid,)).fetchone())
+    return jsonify({"event": new_event}), 201
 
 
 @events_bp.route("/api/events/generate-recurring", methods=["POST"])

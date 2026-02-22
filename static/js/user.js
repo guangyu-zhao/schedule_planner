@@ -93,6 +93,7 @@ function openProfile() {
             langSelect.appendChild(opt);
         });
         langSelect.value = currentUser?.language || (window.I18n.getLanguage ? window.I18n.getLanguage() : 'en');
+        langSelect.onchange = () => changeLanguage(langSelect.value);
     }
 }
 
@@ -103,6 +104,29 @@ function closeProfile() {
 document.getElementById('profileOverlay')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) closeProfile();
 });
+
+async function changeLanguage(language) {
+    if (!language || !currentUser) return;
+    const prevLang = window.I18n && window.I18n.getLanguage ? window.I18n.getLanguage() : 'en';
+    if (language === prevLang) return;
+
+    try {
+        const res = await fetch('/api/user/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: currentUser.username || '',
+                bio: currentUser.bio || '',
+                language,
+            }),
+        });
+        if (!res.ok) return;
+        if (window.I18n && window.I18n.setLanguage) {
+            window.I18n.setLanguage(language);
+        }
+        window.location.reload();
+    } catch { /* ignore */ }
+}
 
 async function saveProfile() {
     const username = document.getElementById('profileUsername').value.trim();
@@ -400,17 +424,6 @@ function updateThemeIcon() {
 }
 
 document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
-
-/* ===== Keyboard Shortcuts Help ===== */
-document.addEventListener('keydown', e => {
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-        const tag = document.activeElement.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        e.preventDefault();
-        const modal = document.getElementById('shortcutsModal');
-        if (modal) modal.classList.toggle('active');
-    }
-});
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();

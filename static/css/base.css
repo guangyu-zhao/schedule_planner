@@ -95,8 +95,7 @@ body {
 [dir="rtl"] .user-dropdown { right: auto; left: 0; }
 [dir="rtl"] .schedule-page-inner { direction: rtl; }
 [dir="rtl"] .notes-editor { text-align: right; }
-[dir="rtl"] .drawer { right: auto; left: 0; transform: translateX(-100%); }
-[dir="rtl"] .drawer.active { transform: translateX(0); }
+[dir="rtl"] .drawer { right: auto; left: 0; animation-name: slideInRtl; }
 [dir="rtl"] .drawer-close { right: auto; left: 16px; }
 [dir="rtl"] .popover { text-align: right; }
 [dir="rtl"] .modal-footer { flex-direction: row-reverse; }

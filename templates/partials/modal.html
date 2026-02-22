@@ -88,37 +88,6 @@
     </div>
 </div>
 
-<!-- Keyboard Shortcuts Help -->
-<div class="modal-overlay" id="shortcutsModal">
-    <div class="modal" style="width: 480px;">
-        <div class="modal-header">
-            <h3 data-i18n="shortcuts.title">Keyboard Shortcuts</h3>
-            <button class="modal-close" onclick="document.getElementById('shortcutsModal').classList.remove('active')">&times;</button>
-        </div>
-        <div class="modal-body" style="padding:12px 20px;">
-            <div class="shortcut-section">
-                <h4 class="shortcut-section-title" data-i18n="shortcuts.schedule">Schedule</h4>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.undo">Undo</span><kbd>Ctrl</kbd> + <kbd>Z</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.editEvent">Edit selected event</span><kbd>Enter</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.deleteEvent">Delete selected event</span><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.toggleComplete">Toggle complete status</span><kbd>Space</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.newEvent">Quick new event</span><kbd>N</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.closePopup">Close popup</span><kbd>Esc</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.saveEvent">Save event</span><kbd>Enter</kbd> (in edit box)</div>
-            </div>
-            <div class="shortcut-section">
-                <h4 class="shortcut-section-title" data-i18n="shortcuts.notes">Notes Editor</h4>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.indent">Indent</span><kbd>Tab</kbd></div>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.outdent">Outdent</span><kbd>Shift</kbd> + <kbd>Tab</kbd></div>
-            </div>
-            <div class="shortcut-section">
-                <h4 class="shortcut-section-title" data-i18n="shortcuts.global">Global</h4>
-                <div class="shortcut-row"><span class="shortcut-desc" data-i18n="shortcuts.openShortcuts">Open shortcuts help</span><kbd>?</kbd></div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Action Popover -->
 <div class="popover" id="actionPopover">
     <button class="popover-btn" id="popoverEdit"><span class="popover-icon">✏️</span> <span data-i18n="popover.edit">Edit</span></button>

@@ -192,6 +192,11 @@
     to { transform: translateX(0); }
 }
 
+@keyframes slideInRtl {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
 .drawer-header {
     display: flex;
     align-items: center;

@@ -114,7 +114,6 @@ def init_db():
             priority INTEGER DEFAULT 2,
             completed INTEGER DEFAULT 0,
             col_type TEXT DEFAULT 'plan',
-            link_id INTEGER,
             created_at TEXT DEFAULT (datetime('now','localtime')),
             updated_at TEXT DEFAULT (datetime('now','localtime'))
         )
@@ -223,7 +222,6 @@ def _migrate_events(conn):
     cols = _get_columns(conn, "events")
     migrations = [
         ("col_type", "TEXT", "'plan'"),
-        ("link_id", "INTEGER", "NULL"),
         ("user_id", "INTEGER", "NULL"),
         ("recur_rule", "TEXT", "NULL"),
         ("recur_parent_id", "INTEGER", "NULL"),
@@ -294,7 +292,6 @@ def _create_indexes(conn):
         "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
         "CREATE INDEX IF NOT EXISTS idx_vcode_email ON verification_codes(email, used)",
         "CREATE INDEX IF NOT EXISTS idx_events_title ON events(user_id, title)",
-        "CREATE INDEX IF NOT EXISTS idx_events_link ON events(link_id)",
         "CREATE INDEX IF NOT EXISTS idx_events_recur ON events(recur_parent_id)",
         "CREATE INDEX IF NOT EXISTS idx_templates_user ON event_templates(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_events_col_type ON events(user_id, col_type, date)",

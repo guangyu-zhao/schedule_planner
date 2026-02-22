@@ -241,6 +241,24 @@ def export_data():
     if not user:
         return jsonify({"error": "用户不存在"}), 404
 
+    STRIP_FIELDS = {"id", "user_id"}
+
+    exported_events = [
+        {k: v for k, v in dict(e).items() if k not in STRIP_FIELDS}
+        for e in events
+    ]
+
+    exported_timer = [
+        {k: v for k, v in dict(r).items() if k not in STRIP_FIELDS}
+        for r in timer_records
+    ]
+
+    exported_notes = [
+        {k: v for k, v in dict(n).items() if k not in STRIP_FIELDS}
+        for n in notes
+        if (n["content"] or "").strip()
+    ]
+
     export = {
         "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "user": {
@@ -248,9 +266,9 @@ def export_data():
             "email": user["email"],
             "created_at": user["created_at"],
         },
-        "events": [dict(e) for e in events],
-        "timer_records": [dict(r) for r in timer_records],
-        "notes": [dict(n) for n in notes],
+        "events": exported_events,
+        "timer_records": exported_timer,
+        "notes": exported_notes,
     }
 
     return jsonify(export), 200, {
@@ -375,7 +393,6 @@ def import_data():
 
     conn = get_db()
     event_count = 0
-    old_to_new_id = {}
     for e in imported_events:
         if not e.get("title") or not e.get("date") or not e.get("start_time") or not e.get("end_time"):
             continue
@@ -393,7 +410,7 @@ def import_data():
                 priority = 2
         except (ValueError, TypeError):
             priority = 2
-        cursor = conn.execute(
+        conn.execute(
             """INSERT INTO events (user_id, title, description, date, start_time, end_time,
                color, category, priority, completed, col_type)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -402,18 +419,7 @@ def import_data():
              e.get("category", "其他"), priority,
              1 if e.get("completed") else 0, col_type),
         )
-        if e.get("id"):
-            old_to_new_id[e["id"]] = cursor.lastrowid
         event_count += 1
-
-    for e in imported_events:
-        old_id = e.get("id")
-        old_link = e.get("link_id")
-        if old_id and old_link and old_id in old_to_new_id and old_link in old_to_new_id:
-            conn.execute(
-                "UPDATE events SET link_id=? WHERE id=?",
-                (old_to_new_id[old_link], old_to_new_id[old_id]),
-            )
 
     timer_count = 0
     for r in imported_timer:

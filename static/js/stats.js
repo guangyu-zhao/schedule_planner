@@ -108,7 +108,9 @@ export class StatisticsManager {
         const { start, end } = this.getDateRange();
         try {
             const r = await fetch(`/api/analytics?start=${start}&end=${end}`);
+            if (!r.ok) return;
             const data = await r.json();
+            if (!data.events || !data.timer_records) return;
             this.renderSummary(data);
             this.renderCharts(data);
         } catch (e) { console.error(e); }
@@ -242,4 +244,5 @@ export class StatisticsManager {
             }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
         });
     }
+
 }

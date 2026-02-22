@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日程规划器 - 登录</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="auth-brand">
+                <div class="auth-logo">📅</div>
+                <h1>日程规划器</h1>
+                <p class="auth-tagline">高效管理时间，专注成就目标</p>
+            </div>
+            <div class="auth-features">
+                <div class="auth-feature">
+                    <span class="feature-icon">📋</span>
+                    <div>
+                        <strong>日程安排</strong>
+                        <p>计划与实际执行双栏对照，让每一天清晰可见</p>
+                    </div>
+                </div>
+                <div class="auth-feature">
+                    <span class="feature-icon">⏱️</span>
+                    <div>
+                        <strong>专注计时</strong>
+                        <p>番茄钟式专注计时，记录每一段深度工作</p>
+                    </div>
+                </div>
+                <div class="auth-feature">
+                    <span class="feature-icon">📊</span>
+                    <div>
+                        <strong>数据统计</strong>
+                        <p>多维度可视化分析，洞察时间使用趋势</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="auth-right">
+            <!-- Login Form -->
+            <div class="auth-form-wrap active" id="loginForm">
+                <h2>欢迎回来</h2>
+                <p class="auth-subtitle">登录您的账户继续使用</p>
+                <form onsubmit="return handleLogin(event)">
+                    <div class="auth-field">
+                        <label for="loginEmail">邮箱</label>
+                        <input type="email" id="loginEmail" placeholder="your@email.com" required autocomplete="email">
+                    </div>
+                    <div class="auth-field">
+                        <label for="loginPassword">密码</label>
+                        <input type="password" id="loginPassword" placeholder="输入密码" required autocomplete="current-password">
+                    </div>
+                    <div class="auth-options">
+                        <label class="auth-checkbox">
+                            <input type="checkbox" id="loginRemember" checked>
+                            <span>记住登录</span>
+                        </label>
+                        <a href="#" class="auth-link" onclick="showForm('forgot')">忘记密码？</a>
+                    </div>
+                    <div class="auth-error" id="loginError"></div>
+                    <button type="submit" class="auth-btn" id="loginBtn">登录</button>
+                </form>
+                <div class="auth-switch">
+                    还没有账户？<a href="#" onclick="showForm('register')">立即注册</a>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div class="auth-form-wrap" id="registerForm">
+                <h2>创建账户</h2>
+                <p class="auth-subtitle">注册开始管理您的时间</p>
+                <form onsubmit="return handleRegister(event)">
+                    <div class="auth-field">
+                        <label for="regEmail">邮箱</label>
+                        <input type="email" id="regEmail" placeholder="your@email.com" required autocomplete="email">
+                    </div>
+                    <div class="auth-field">
+                        <label for="regUsername">用户名</label>
+                        <input type="text" id="regUsername" placeholder="2-30 个字符" required minlength="2" maxlength="30" autocomplete="username">
+                    </div>
+                    <div class="auth-field">
+                        <label for="regPassword">密码</label>
+                        <input type="password" id="regPassword" placeholder="至少 8 位，包含字母和数字" required minlength="8" autocomplete="new-password">
+                    </div>
+                    <div class="auth-field">
+                        <label for="regConfirm">确认密码</label>
+                        <input type="password" id="regConfirm" placeholder="再次输入密码" required autocomplete="new-password">
+                    </div>
+                    <div class="auth-error" id="registerError"></div>
+                    <button type="submit" class="auth-btn" id="registerBtn">注册</button>
+                </form>
+                <div class="auth-switch">
+                    已有账户？<a href="#" onclick="showForm('login')">返回登录</a>
+                </div>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <div class="auth-form-wrap" id="forgotForm">
+                <h2>重置密码</h2>
+                <p class="auth-subtitle" id="forgotSubtitle">输入您的注册邮箱，我们将发送验证码</p>
+
+                <!-- Step 1: Enter email -->
+                <div id="forgotStep1">
+                    <form onsubmit="return handleForgot(event)">
+                        <div class="auth-field">
+                            <label for="forgotEmail">邮箱</label>
+                            <input type="email" id="forgotEmail" placeholder="your@email.com" required autocomplete="email">
+                        </div>
+                        <div class="auth-error" id="forgotError"></div>
+                        <button type="submit" class="auth-btn" id="forgotBtn">发送验证码</button>
+                    </form>
+                </div>
+
+                <!-- Step 2: Enter code -->
+                <div id="forgotStep2" style="display:none">
+                    <form onsubmit="return handleVerifyCode(event)">
+                        <div class="auth-field">
+                            <label for="verifyCode">验证码</label>
+                            <input type="text" id="verifyCode" placeholder="输入 6 位验证码" required maxlength="6" pattern="\d{6}" autocomplete="one-time-code" inputmode="numeric">
+                        </div>
+                        <div class="auth-error" id="verifyError"></div>
+                        <button type="submit" class="auth-btn" id="verifyBtn">验证</button>
+                    </form>
+                </div>
+
+                <!-- Step 3: New password -->
+                <div id="forgotStep3" style="display:none">
+                    <form onsubmit="return handleResetPassword(event)">
+                        <div class="auth-field">
+                            <label for="newPassword">新密码</label>
+                            <input type="password" id="newPassword" placeholder="至少 8 位，包含字母和数字" required minlength="8" autocomplete="new-password">
+                        </div>
+                        <div class="auth-field">
+                            <label for="newConfirm">确认新密码</label>
+                            <input type="password" id="newConfirm" placeholder="再次输入新密码" required autocomplete="new-password">
+                        </div>
+                        <div class="auth-error" id="resetError"></div>
+                        <button type="submit" class="auth-btn" id="resetBtn">重置密码</button>
+                    </form>
+                </div>
+
+                <div class="auth-switch">
+                    <a href="#" onclick="showForm('login')">← 返回登录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var t = localStorage.getItem('theme');
+            if (t) document.documentElement.setAttribute('data-theme', t);
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
+    <script src="/static/js/auth.js"></script>
+</body>
+</html>

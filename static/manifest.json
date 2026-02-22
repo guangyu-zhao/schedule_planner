@@ -1,0 +1,22 @@
+{
+    "name": "日程规划器",
+    "short_name": "日程规划",
+    "description": "高效管理时间，专注成就目标",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#6c5ce7",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/static/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

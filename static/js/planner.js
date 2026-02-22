@@ -22,16 +22,24 @@ export class PlannerApp {
         this.editingEvent = null;
         this.editingColType = null;
         this.selectedColor = COLORS[0];
-        this.lastDeletedEvent = null;
         this.toastTimer = null;
         this.popoverEventId = null;
         this.selectedEventId = null;
         this.undoHistory = [];
         this._undoing = false;
 
+        this.isDragMoving = false;
+        this.dragMoveEventId = null;
+        this.dragMoveStartY = 0;
+        this.dragMoveStartTop = 0;
+        this.dragMoveEl = null;
+
         this.noteContent = '';
         this.noteSaveTimer = null;
         this.noteMode = 'edit';
+
+        this.reminderTimers = [];
+        this.notifiedEventIds = new Set();
 
         this.init();
     }
@@ -45,7 +53,6 @@ export class PlannerApp {
         this.renderCalendar();
         this.renderGrid();
         this.fetchEvents();
-        this.fetchStats();
         this.fetchNote();
         this.scrollToCurrentTime();
         this.startTimeIndicator();
@@ -123,7 +130,6 @@ export class PlannerApp {
         this.renderCalendar();
         this.renderGrid();
         this.fetchEvents();
-        this.fetchStats();
         this.fetchNote();
         this.scrollToCurrentTime();
     }
@@ -177,11 +183,25 @@ export class PlannerApp {
             el.style.color = this.getContrastColor(evt.color);
 
             const showMeta = height >= SLOT_HEIGHT * 1.6;
+            const recurIcon = evt.recur_rule ? ' 🔁' : (evt.recur_parent_id ? ' 🔁' : '');
             el.innerHTML =
                 `<div class="resize-handle resize-handle-top"></div>` +
-                `<div class="event-title">${escHtml(evt.title)}</div>` +
-                (showMeta ? `<div class="event-meta">${evt.start_time}-${evt.end_time} · ${CATEGORY_ICONS[evt.category] || ''}${evt.category}</div>` : '') +
+                `<div class="event-title">${escHtml(evt.title)}${recurIcon}</div>` +
+                (showMeta ? `<div class="event-meta">${escHtml(evt.start_time)}-${escHtml(evt.end_time)} · ${CATEGORY_ICONS[evt.category] || ''}${escHtml(evt.category)}</div>` : '') +
                 `<div class="resize-handle resize-handle-bottom"></div>`;
+
+            el.setAttribute('draggable', 'true');
+            el.addEventListener('dragstart', e => {
+                if (this.isResizing) { e.preventDefault(); return; }
+                this.dragMoveEventId = evt.id;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(evt.id));
+                el.classList.add('dragging');
+            });
+            el.addEventListener('dragend', () => {
+                el.classList.remove('dragging');
+                this.dragMoveEventId = null;
+            });
 
             el.addEventListener('click', e => {
                 if (this.isResizing) return;
@@ -192,6 +212,7 @@ export class PlannerApp {
             col.appendChild(el);
         }
         this.updateTimeIndicator();
+        this.scheduleReminders();
         if (this.selectedEventId) {
             const sel = document.querySelector(`.event[data-event-id="${this.selectedEventId}"]`);
             if (sel) sel.classList.add('selected');
@@ -205,7 +226,61 @@ export class PlannerApp {
         grid.scrollTop = Math.max(0, ((now.getHours() * 60 + now.getMinutes()) / 30 - 4) * SLOT_HEIGHT);
     }
 
-    startTimeIndicator() { this.updateTimeIndicator(); setInterval(() => this.updateTimeIndicator(), 60000); }
+    startTimeIndicator() {
+        this.updateTimeIndicator();
+        if (this._timeIndicatorInterval) clearInterval(this._timeIndicatorInterval);
+        this._timeIndicatorInterval = setInterval(() => this.updateTimeIndicator(), 60000);
+        this.requestNotificationPermission();
+    }
+
+    requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+
+    scheduleReminders() {
+        for (const timer of this.reminderTimers) clearTimeout(timer);
+        this.reminderTimers = [];
+
+        if (!this.isToday(this.selectedDate)) return;
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+        const now = new Date();
+        const todayStr = fmtDateISO(now);
+        const planEvents = this.events.filter(
+            e => e.date === todayStr && (e.col_type || 'plan') === 'plan' && !e.completed
+        );
+
+        for (const evt of planEvents) {
+            if (this.notifiedEventIds.has(evt.id)) continue;
+            const [h, m] = evt.start_time.split(':').map(Number);
+            const eventTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+            const reminderTime = eventTime.getTime() - 5 * 60 * 1000;
+            const delay = reminderTime - now.getTime();
+
+            if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
+                const timer = setTimeout(() => {
+                    this.notifiedEventIds.add(evt.id);
+                    new Notification('即将开始', {
+                        body: `"${evt.title}" 将在 5 分钟后开始 (${evt.start_time})`,
+                        icon: '/static/icons/icon-192.png',
+                        tag: `event-${evt.id}`,
+                    });
+                }, delay);
+                this.reminderTimers.push(timer);
+            } else if (delay > -60000 && delay <= 0) {
+                if (!this.notifiedEventIds.has(`now-${evt.id}`)) {
+                    this.notifiedEventIds.add(`now-${evt.id}`);
+                    new Notification('现在开始', {
+                        body: `"${evt.title}" 已经开始 (${evt.start_time}-${evt.end_time})`,
+                        icon: '/static/icons/icon-192.png',
+                        tag: `event-now-${evt.id}`,
+                    });
+                }
+            }
+        }
+    }
 
     updateTimeIndicator() {
         document.querySelectorAll('#scheduleGrid .time-indicator').forEach(el => el.remove());
@@ -226,10 +301,16 @@ export class PlannerApp {
     async fetchEvents() {
         const ds = this.selectedDateStr();
         try {
+            await fetch('/api/events/generate-recurring', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start: ds, end: ds }),
+            }).catch(() => {});
             const r = await fetch(`/api/events?start=${ds}&end=${ds}`);
+            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '加载日程失败', { type: 'error' }); return; }
             this.events = await r.json();
             this.renderEvents();
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误，无法加载日程', { type: 'error' }); }
     }
 
     async createEvent(data) {
@@ -239,13 +320,12 @@ export class PlannerApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '创建日程失败', { type: 'error' }); return null; }
             const result = await r.json();
-            if (result.plan) this.events.push(result.plan);
-            if (result.actual) this.events.push(result.actual);
+            if (result.event) this.events.push(result.event);
             this.renderEvents();
-            this.fetchStats();
             return result;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
     }
 
     async updateEvent(id, data) {
@@ -255,28 +335,38 @@ export class PlannerApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '更新日程失败', { type: 'error' }); return null; }
             const u = await r.json();
             const idx = this.events.findIndex(e => e.id === id);
             if (idx !== -1) this.events[idx] = u;
             this.renderEvents();
-            this.fetchStats();
             return u;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
     }
 
     async deleteEvent(id) {
         try {
-            const evt = this.events.find(e => e.id === id);
             const r = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+            if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || '删除失败', { type: 'error' }); return null; }
             const data = await r.json();
             this.events = this.events.filter(e => e.id !== id);
-            if (evt && evt.link_id) {
-                this.events = this.events.filter(e => e.id !== evt.link_id);
-            }
             this.renderEvents();
-            this.fetchStats();
             return data.event;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); return null; }
+    }
+
+    async moveEventToColumn(evt, targetColType, startTime, endTime) {
+        if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...evt } });
+
+        await this.deleteEvent(evt.id);
+        const data = {
+            title: evt.title, description: evt.description, date: evt.date,
+            start_time: startTime, end_time: endTime, color: evt.color,
+            category: evt.category, priority: evt.priority, completed: evt.completed,
+            col_type: targetColType,
+        };
+        await this.createEvent(data);
+        showToast(`已移动到${targetColType === 'actual' ? '实际执行' : '计划'}列`);
     }
 
     async batchUpdateEvents(items) {
@@ -290,34 +380,6 @@ export class PlannerApp {
         } catch (e) { console.error(e); }
     }
 
-    async fetchStats() {
-        try {
-            const r = await fetch(`/api/stats?date=${this.selectedDateStr()}`);
-            const s = await r.json();
-            document.getElementById('statTotal').textContent = s.total;
-            document.getElementById('statCompleted').textContent = s.completed;
-            document.getElementById('statHours').textContent = s.total_hours + 'h';
-            document.getElementById('statRate').textContent = s.completion_rate + '%';
-        } catch (e) { console.error(e); }
-    }
-
-    updateLocalStats() {
-        const planEvts = this.events.filter(
-            e => e.date === this.selectedDateStr() && (e.col_type || 'plan') === 'plan'
-        );
-        const total = planEvts.length;
-        const completed = planEvts.filter(e => e.completed).length;
-        let mins = 0;
-        for (const e of planEvts) {
-            const [sh, sm] = e.start_time.split(':').map(Number);
-            const [eh, em] = e.end_time.split(':').map(Number);
-            mins += (eh * 60 + em) - (sh * 60 + sm);
-        }
-        document.getElementById('statTotal').textContent = total;
-        document.getElementById('statCompleted').textContent = completed;
-        document.getElementById('statHours').textContent = (mins / 60).toFixed(1) + 'h';
-        document.getElementById('statRate').textContent = total > 0 ? Math.round(completed / total * 100) + '%' : '0%';
-    }
 
     /* ================================================================
        DRAG-TO-CREATE
@@ -325,6 +387,35 @@ export class PlannerApp {
     bindGridEvents() {
         const container = document.querySelector('#scheduleGrid .dual-columns');
         if (!container) return;
+
+        container.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        container.addEventListener('drop', e => {
+            e.preventDefault();
+            const eventId = parseInt(e.dataTransfer.getData('text/plain'));
+            if (!eventId) return;
+            const targetCol = e.target.closest('.day-column');
+            if (!targetCol) return;
+            const targetColType = targetCol.dataset.col;
+            const evt = this.events.find(ev => ev.id === eventId);
+            if (!evt) return;
+            const currentColType = evt.col_type || 'plan';
+
+            const rect = targetCol.getBoundingClientRect();
+            const slot = Math.floor((e.clientY - rect.top) / SLOT_HEIGHT);
+            const startSlot = Math.max(0, Math.min(slot, TOTAL_SLOTS - 1));
+            const duration = this.timeToSlot(evt.end_time) - this.timeToSlot(evt.start_time);
+            const endSlot = Math.min(startSlot + Math.max(duration, MIN_EVENT_SLOTS), TOTAL_SLOTS);
+
+            if (currentColType !== targetColType) {
+                this.moveEventToColumn(evt, targetColType, this.slotToTime(startSlot), this.slotToTime(endSlot));
+            } else {
+                this.updateEvent(evt.id, { ...evt, start_time: this.slotToTime(startSlot), end_time: this.slotToTime(endSlot) });
+            }
+        });
 
         container.addEventListener('mousedown', e => {
             const handle = e.target.closest('.resize-handle');
@@ -495,7 +586,6 @@ export class PlannerApp {
             }
         }
         this.renderEvents();
-        if (this.resizeCol === 'plan') this.updateLocalStats();
 
         const resEl = document.querySelector(`.event[data-event-id="${this.resizeEventId}"]`);
         if (resEl) resEl.classList.add('resizing');
@@ -544,6 +634,8 @@ export class PlannerApp {
        ================================================================ */
     populateTimeSelects() {
         const ss = document.getElementById('eventStart'), es = document.getElementById('eventEnd');
+        ss.innerHTML = '';
+        es.innerHTML = '';
         for (let i = 0; i < TOTAL_SLOTS; i++) ss.innerHTML += `<option value="${this.slotToTime(i)}">${this.slotToTime(i)}</option>`;
         for (let i = 1; i <= TOTAL_SLOTS; i++) es.innerHTML += `<option value="${this.slotToTime(i)}">${this.slotToTime(i)}</option>`;
     }
@@ -581,6 +673,7 @@ export class PlannerApp {
         document.getElementById('eventCategory').value = '工作';
         document.getElementById('eventPriority').value = '1';
         document.getElementById('eventDescription').value = '';
+        document.getElementById('eventRecur').value = '';
         document.getElementById('deleteBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'none';
         document.getElementById('saveBtn').textContent = '保存';
@@ -601,6 +694,7 @@ export class PlannerApp {
         document.getElementById('eventCategory').value = event.category;
         document.getElementById('eventPriority').value = String(event.priority);
         document.getElementById('eventDescription').value = event.description || '';
+        document.getElementById('eventRecur').value = event.recur_rule || '';
         document.getElementById('deleteBtn').style.display = 'inline-flex';
         document.getElementById('completeBtn').style.display = 'none';
         document.getElementById('saveBtn').textContent = '更新';
@@ -630,6 +724,7 @@ export class PlannerApp {
             priority: parseInt(document.getElementById('eventPriority').value),
             description: document.getElementById('eventDescription').value.trim(),
             completed: this.editingEvent ? this.editingEvent.completed : 0,
+            recur_rule: document.getElementById('eventRecur').value || null,
         };
         if (data.start_time >= data.end_time) { showToast('结束时间必须晚于开始时间'); return; }
 
@@ -641,11 +736,8 @@ export class PlannerApp {
             const colType = this.editingColType || 'plan';
             data.col_type = colType;
             const result = await this.createEvent(data);
-            if (result) {
-                const ids = [];
-                if (result.plan) ids.push(result.plan.id);
-                if (result.actual) ids.push(result.actual.id);
-                if (!this._undoing) this.undoHistory.push({ type: 'create', eventIds: ids });
+            if (result && result.event) {
+                if (!this._undoing) this.undoHistory.push({ type: 'create', eventIds: [result.event.id] });
             }
             showToast('日程已创建');
         }
@@ -706,26 +798,16 @@ export class PlannerApp {
         } else if (action === 'edit') {
             this.showEditModal(event);
         } else if (action === 'delete') {
-            const linkedEvt = event.link_id ? this.events.find(e => e.id === event.link_id) : null;
-            if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...event }, linkedData: linkedEvt ? { ...linkedEvt } : null });
+            if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...event } });
             const d = await this.deleteEvent(id);
-            if (d) { showToast('日程已删除'); }
+            if (d) { showToast('日程已删除', { undo: true }); }
             this.deselectEvent();
         }
     }
 
-    async undoDelete() {
-        if (!this.lastDeletedEvent) return;
-        const evt = this.lastDeletedEvent;
-        this.lastDeletedEvent = null;
+    undoLastAction() {
         document.getElementById('toast').classList.remove('active');
-        await this.createEvent({
-            title: evt.title, description: evt.description, date: evt.date,
-            start_time: evt.start_time, end_time: evt.end_time, color: evt.color,
-            category: evt.category, priority: evt.priority, completed: evt.completed,
-            col_type: evt.col_type || 'plan',
-        });
-        showToast('已撤销删除');
+        this.undo();
     }
 
     async undo() {
@@ -739,28 +821,18 @@ export class PlannerApp {
                     this.events = this.events.filter(e => e.id !== id);
                 }
                 this.renderEvents();
-                this.fetchStats();
                 showToast('已撤销创建');
             } else if (action.type === 'edit') {
                 await this.updateEvent(action.id, action.prevData);
                 showToast('已撤销编辑');
             } else if (action.type === 'delete') {
                 const ev = action.eventData;
-                if (ev.col_type === 'plan' || !ev.col_type) {
-                    await this.createEvent({
-                        title: ev.title, description: ev.description, date: ev.date,
-                        start_time: ev.start_time, end_time: ev.end_time, color: ev.color,
-                        category: ev.category, priority: ev.priority, completed: ev.completed,
-                        col_type: 'plan',
-                    });
-                } else {
-                    await this.createEvent({
-                        title: ev.title, description: ev.description, date: ev.date,
-                        start_time: ev.start_time, end_time: ev.end_time, color: ev.color,
-                        category: ev.category, priority: ev.priority, completed: ev.completed,
-                        col_type: 'actual',
-                    });
-                }
+                await this.createEvent({
+                    title: ev.title, description: ev.description, date: ev.date,
+                    start_time: ev.start_time, end_time: ev.end_time, color: ev.color,
+                    category: ev.category, priority: ev.priority, completed: ev.completed,
+                    col_type: ev.col_type || 'plan',
+                });
                 showToast('已撤销删除');
             } else if (action.type === 'complete') {
                 const evt = this.events.find(e => e.id === action.id);
@@ -784,17 +856,16 @@ export class PlannerApp {
         document.getElementById('deleteBtn').addEventListener('click', async () => {
             if (!this.editingEvent) return;
             const ev = this.editingEvent;
-            const linkedEvt = ev.link_id ? this.events.find(e => e.id === ev.link_id) : null;
-            if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...ev }, linkedData: linkedEvt ? { ...linkedEvt } : null });
+            if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...ev } });
             await this.deleteEvent(ev.id);
             this.closeModal();
-            showToast('日程已删除');
+            showToast('日程已删除', { undo: true });
         });
         document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) this.closeModal(); });
         document.getElementById('popoverComplete').addEventListener('click', () => this.handlePopoverAction('complete'));
         document.getElementById('popoverEdit').addEventListener('click', () => this.handlePopoverAction('edit'));
         document.getElementById('popoverDelete').addEventListener('click', () => this.handlePopoverAction('delete'));
-        document.getElementById('toastAction').addEventListener('click', () => this.undoDelete());
+        document.getElementById('toastAction').addEventListener('click', () => this.undoLastAction());
         document.addEventListener('click', e => {
             if (!e.target.closest('.popover') && !e.target.closest('.event')) {
                 this.hidePopover();
@@ -844,6 +915,17 @@ export class PlannerApp {
                     e.preventDefault();
                     this.handlePopoverAction('complete');
                 }
+                return;
+            }
+
+            if (e.key === 'n' || e.key === 'N') {
+                if (document.querySelector('.page.active')?.id !== 'schedulePage') return;
+                e.preventDefault();
+                const now = new Date();
+                const startSlot = now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
+                const endSlot = Math.min(startSlot + 2, TOTAL_SLOTS);
+                this.editingColType = 'plan';
+                this.showCreateModal(this.selectedDateStr(), this.slotToTime(startSlot), this.slotToTime(endSlot));
             }
         });
     }
@@ -886,7 +968,6 @@ export class PlannerApp {
                 breaks: true,
                 gfm: true,
                 extensions,
-                tokenizer: { code() { } },
             });
         }
 
@@ -976,21 +1057,48 @@ export class PlannerApp {
         } catch (e) { console.error(e); }
     }
 
+    updateSaveIndicator(state) {
+        const ind = document.getElementById('noteSaveIndicator');
+        if (!ind) return;
+        ind.className = 'note-save-indicator';
+        if (state === 'saving') {
+            ind.textContent = '保存中...';
+            ind.classList.add('saving');
+        } else if (state === 'saved') {
+            ind.textContent = '已保存';
+            ind.classList.add('saved');
+            clearTimeout(this._savedIndicatorTimer);
+            this._savedIndicatorTimer = setTimeout(() => {
+                ind.textContent = '';
+                ind.className = 'note-save-indicator';
+            }, 2000);
+        } else {
+            ind.textContent = '';
+        }
+    }
+
     debounceSaveNote() {
         if (this.noteSaveTimer) clearTimeout(this.noteSaveTimer);
         const dateToSave = this.selectedDateStr();
         const contentToSave = this.noteContent;
         this._pendingNoteSave = { date: dateToSave, content: contentToSave };
+        this.updateSaveIndicator('saving');
         this.noteSaveTimer = setTimeout(async () => {
             this.noteSaveTimer = null;
             this._pendingNoteSave = null;
             try {
-                await fetch('/api/notes', {
+                const r = await fetch('/api/notes', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ date: dateToSave, content: contentToSave }),
                 });
-            } catch (e) { console.error(e); }
+                if (!r.ok) { this.updateSaveIndicator(''); showToast('笔记保存失败', { type: 'error' }); return; }
+                this.updateSaveIndicator('saved');
+            } catch (e) {
+                console.error(e);
+                this.updateSaveIndicator('');
+                showToast('网络错误，笔记保存失败', { type: 'error' });
+            }
         }, 800);
     }
 
@@ -1033,6 +1141,9 @@ export class PlannerApp {
             });
             let html = marked.parse(content);
             html = html.replace(/<br\s*\/?>/g, '<span class="hard-break"></span>');
+            if (typeof DOMPurify !== 'undefined') {
+                html = DOMPurify.sanitize(html, { ADD_TAGS: ['span'], ADD_ATTR: ['class'] });
+            }
             preview.innerHTML = html;
         } else {
             preview.textContent = this.noteContent;

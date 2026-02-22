@@ -1,1 +1,5 @@
 flask>=3.0
+flask-limiter
+Pillow
+gunicorn; sys_platform != "win32"
+waitress; sys_platform == "win32"

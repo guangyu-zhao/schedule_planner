@@ -19,4 +19,27 @@ document.addEventListener('DOMContentLoaded', () => {
     window.planner = new PlannerApp();
     window.timer = new TimerManager();
     window.stats = new StatisticsManager();
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        const activePage = document.querySelector('.page.active');
+        if (!activePage) return;
+        const id = activePage.id;
+        if (id === 'schedulePage' && window.planner) {
+            window.planner.fetchEvents();
+        } else if (id === 'timerPage' && window.timer) {
+            window.timer.fetchRecords();
+            window.timer.fetchStats();
+        } else if (id === 'statsPage' && window.stats) {
+            window.stats.loadData();
+        }
+    });
+
+    window.addEventListener('online', () => {
+        document.getElementById('offlineBanner')?.classList.remove('active');
+        if (window.planner) window.planner.fetchEvents();
+    });
+    window.addEventListener('offline', () => {
+        document.getElementById('offlineBanner')?.classList.add('active');
+    });
 });

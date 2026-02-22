@@ -27,24 +27,6 @@
     padding: 2px 0 0;
 }
 
-.schedule-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-md);
-}
-
-.ss-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 12px;
-}
-.ss-label { color: var(--text-secondary); font-weight: 500; }
-.ss-val { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
-
 .schedule-main {
     flex: 1;
     display: flex;
@@ -199,6 +181,9 @@
 .event.priority-2 { border-left-color: var(--warning); }
 .event.priority-3 { border-left-color: var(--success); }
 .event.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow-md); z-index: 6; }
+.event.dragging { opacity: 0.4; }
+.event[draggable="true"] { cursor: grab; }
+.event[draggable="true"]:active { cursor: grabbing; }
 
 /* Resize Handles */
 .resize-handle {
@@ -491,11 +476,20 @@
 }
 .schedule-cal .today-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 
+/* Note save indicator */
+.note-save-indicator {
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 6px;
+    transition: opacity 0.3s;
+}
+.note-save-indicator.saving { color: var(--warning); }
+.note-save-indicator.saved { color: var(--success); }
+
 @media (max-width: 900px) {
     .schedule-page-inner { flex-direction: column; }
     .schedule-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); flex-direction: row; flex-wrap: wrap; }
     .schedule-sidebar .schedule-cal { flex: 1; min-width: 220px; }
-    .schedule-sidebar .schedule-stats { flex: 1; min-width: 180px; }
     .schedule-main { flex-direction: column; }
     .schedule-grid-panel { border-right: none; border-bottom: 2px solid var(--border-color); min-height: 50vh; }
     .notes-panel { min-height: 30vh; }

@@ -12,15 +12,29 @@ export class TimerManager {
         this.originalTitle = document.title;
         this.selectedDate = new Date();
         this.calendarMonth = new Date();
+        this.ambientSound = 'none';
+        this.ambientCtx = null;
+        this.ambientNodes = [];
+        this.ambientVolume = 0.3;
+        this.ambientGain = null;
+        this.pomodoroCount = 0;
+        this.isBreak = false;
+        this.shortBreakMin = 5;
+        this.longBreakMin = 15;
+        this.pomodorosUntilLong = 4;
+        this.autoBreak = true;
         this.init();
     }
 
     init() {
         this.bindEvents();
+        this.bindAmbientEvents();
+        this.bindBreakSettings();
         this.renderCalendar();
         this.updateDisplay();
         this.fetchRecords();
         this.fetchStats();
+        this.updatePomodoroIndicator();
     }
 
     selectedDateStr() { return fmtDateISO(this.selectedDate); }
@@ -164,10 +178,13 @@ export class TimerManager {
 
     async stop() {
         const wasRunning = this.state === 'running' || this.state === 'paused';
+        const wasBreak = this.isBreak;
         clearInterval(this.intervalId);
         this.intervalId = null;
-        if (wasRunning && this.elapsedSeconds >= 10) await this.saveRecord(false);
+        if (wasRunning && !wasBreak && this.elapsedSeconds >= 10) await this.saveRecord(false);
+        this.isBreak = false;
         this.state = 'idle';
+        this.totalSeconds = this.plannedMinutes * 60;
         this.remainingSeconds = this.totalSeconds;
         this.elapsedSeconds = 0;
         this.updateControlsVisibility();
@@ -175,6 +192,7 @@ export class TimerManager {
         this.updateBadge(false);
         document.title = this.originalTitle;
         document.getElementById('timerDisplay').classList.remove('paused');
+        document.querySelector('.timer-ring-wrap').classList.remove('break-mode');
     }
 
     async tick() {
@@ -189,23 +207,80 @@ export class TimerManager {
     }
 
     async complete() {
+        if (this.isBreak) {
+            this.playSound();
+            showToast('休息结束，准备开始下一轮专注！');
+            document.getElementById('timerStateLabel').textContent = '休息结束';
+            this.isBreak = false;
+            document.querySelector('.timer-ring-wrap').classList.remove('break-mode');
+            setTimeout(() => {
+                this.state = 'idle';
+                this.remainingSeconds = this.totalSeconds;
+                this.elapsedSeconds = 0;
+                this.updateControlsVisibility();
+                this.updateDisplay();
+                this.updateBadge(false);
+                document.title = this.originalTitle;
+                document.getElementById('timerDisplay').classList.remove('paused');
+                this.updatePomodoroIndicator();
+            }, 2000);
+            return;
+        }
+
         this.playSound();
         this.showNotification();
         await this.saveRecord(true);
-        showToast('专注完成！🎉');
+        this.pomodoroCount++;
+        showToast(`专注完成！(第 ${this.pomodoroCount} 个番茄钟)`);
         document.getElementById('timerStateLabel').textContent = '完成！';
         document.querySelector('.timer-ring-wrap').classList.add('completed');
+
+        const shouldAutoBreak = this.autoBreak;
         setTimeout(() => {
             document.querySelector('.timer-ring-wrap').classList.remove('completed');
-            this.state = 'idle';
-            this.remainingSeconds = this.totalSeconds;
-            this.elapsedSeconds = 0;
-            this.updateControlsVisibility();
-            this.updateDisplay();
-            this.updateBadge(false);
-            document.title = this.originalTitle;
-            document.getElementById('timerDisplay').classList.remove('paused');
+            if (shouldAutoBreak) {
+                this.startBreak();
+            } else {
+                this.state = 'idle';
+                this.remainingSeconds = this.totalSeconds;
+                this.elapsedSeconds = 0;
+                this.updateControlsVisibility();
+                this.updateDisplay();
+                this.updateBadge(false);
+                document.title = this.originalTitle;
+                document.getElementById('timerDisplay').classList.remove('paused');
+            }
+            this.updatePomodoroIndicator();
         }, 3000);
+    }
+
+    startBreak() {
+        const isLong = this.pomodoroCount % this.pomodorosUntilLong === 0;
+        const breakMin = isLong ? this.longBreakMin : this.shortBreakMin;
+        this.isBreak = true;
+        this.state = 'running';
+        this.totalSeconds = breakMin * 60;
+        this.remainingSeconds = breakMin * 60;
+        this.elapsedSeconds = 0;
+        document.getElementById('timerStateLabel').textContent = isLong ? '长休息中...' : '短休息中...';
+        document.querySelector('.timer-ring-wrap').classList.add('break-mode');
+        this.updateControlsVisibility();
+        this.updateDisplay();
+        this.updateBadge(true);
+        this.intervalId = setInterval(() => this.tick(), 1000);
+        showToast(isLong ? `长休息 ${breakMin} 分钟` : `短休息 ${breakMin} 分钟`);
+    }
+
+    updatePomodoroIndicator() {
+        const el = document.getElementById('pomodoroIndicator');
+        if (!el) return;
+        const inCycle = this.pomodoroCount % this.pomodorosUntilLong;
+        let html = '';
+        for (let i = 0; i < this.pomodorosUntilLong; i++) {
+            html += `<span class="pomo-dot${i < inCycle ? ' filled' : ''}"></span>`;
+        }
+        html += `<span class="pomo-count">${this.pomodoroCount} 个番茄钟</span>`;
+        el.innerHTML = html;
     }
 
     updateDisplay() {
@@ -217,8 +292,11 @@ export class TimerManager {
         const ring = document.querySelector('.timer-ring-progress');
         if (ring) ring.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
         if (this.state === 'running') {
-            document.getElementById('timerStateLabel').textContent = '专注中...';
-            document.title = `${ts} - ${document.getElementById('timerTaskName').value || '计时中'} | 日程规划器`;
+            if (!this.isBreak) {
+                document.getElementById('timerStateLabel').textContent = '专注中...';
+            }
+            const label = this.isBreak ? '休息中' : (document.getElementById('timerTaskName').value || '计时中');
+            document.title = `${ts} - ${label} | 日程规划器`;
         } else if (this.state === 'idle') {
             document.getElementById('timerStateLabel').textContent = '准备开始';
         }
@@ -255,7 +333,7 @@ export class TimerManager {
 
     async saveRecord(completed) {
         try {
-            await fetch('/api/timer/records', {
+            const r = await fetch('/api/timer/records', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -266,37 +344,42 @@ export class TimerManager {
                     completed: completed ? 1 : 0,
                 }),
             });
+            if (!r.ok) { showToast('保存记录失败', { type: 'error' }); return; }
             if (this.selectedDateStr() === this.todayStr()) {
                 this.fetchRecords();
                 this.fetchStats();
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误，记录保存失败', { type: 'error' }); }
     }
 
     async fetchRecords() {
         try {
             const r = await fetch(`/api/timer/records?date=${this.selectedDateStr()}`);
-            this.renderRecords(await r.json());
+            if (!r.ok) { showToast('加载记录失败', { type: 'error' }); return; }
+            const data = await r.json();
+            this.renderRecords(Array.isArray(data) ? data : []);
         } catch (e) { console.error(e); }
     }
 
     async fetchStats() {
         try {
             const r = await fetch(`/api/timer/stats?date=${this.selectedDateStr()}`);
+            if (!r.ok) return;
             const s = await r.json();
-            const m = Math.round(s.total_seconds / 60);
+            const m = Math.round((s.total_seconds || 0) / 60);
             document.getElementById('tsFocusTime').textContent = m >= 60 ? `${Math.floor(m / 60)}h${m % 60 > 0 ? m % 60 + 'm' : ''}` : `${m}分钟`;
-            document.getElementById('tsTaskCount').textContent = s.total;
-            document.getElementById('tsCompleted').textContent = s.completed;
+            document.getElementById('tsTaskCount').textContent = s.total || 0;
+            document.getElementById('tsCompleted').textContent = s.completed || 0;
         } catch (e) { console.error(e); }
     }
 
     async deleteRecord(id) {
         try {
-            await fetch(`/api/timer/records/${id}`, { method: 'DELETE' });
+            const r = await fetch(`/api/timer/records/${id}`, { method: 'DELETE' });
+            if (!r.ok) { showToast('删除记录失败', { type: 'error' }); return; }
             this.fetchRecords();
             this.fetchStats();
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('网络错误', { type: 'error' }); }
     }
 
     renderRecords(records) {
@@ -308,5 +391,214 @@ export class TimerManager {
             return `<div class="timer-record"><div class="tr-status ${r.completed ? 'done' : 'stopped'}">${r.completed ? '✓' : '✗'}</div><div class="tr-info"><div class="tr-name">${escHtml(r.task_name)}</div><div class="tr-meta">${time ? time + ' · ' : ''}${m}分钟 / 计划${r.planned_minutes}分钟${r.completed ? '' : ' · 中途停止'}</div></div><button class="tr-delete" data-id="${r.id}" title="删除">×</button></div>`;
         }).join('');
         list.querySelectorAll('.tr-delete').forEach(btn => btn.addEventListener('click', () => this.deleteRecord(parseInt(btn.dataset.id))));
+    }
+
+    /* ================================================================
+       AMBIENT SOUNDS
+       ================================================================ */
+    bindBreakSettings() {
+        const toggle = document.getElementById('autoBreakToggle');
+        if (toggle) {
+            const saved = localStorage.getItem('autoBreak');
+            this.autoBreak = saved !== null ? saved === 'true' : true;
+            toggle.checked = this.autoBreak;
+            toggle.addEventListener('change', () => {
+                this.autoBreak = toggle.checked;
+                localStorage.setItem('autoBreak', this.autoBreak);
+            });
+        }
+        const resetBtn = document.getElementById('resetPomodoroBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                this.pomodoroCount = 0;
+                this.updatePomodoroIndicator();
+                showToast('番茄钟计数已重置');
+            });
+        }
+    }
+
+    bindAmbientEvents() {
+        document.querySelectorAll('.ambient-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sound = btn.dataset.sound;
+                document.querySelectorAll('.ambient-btn').forEach(b => b.classList.remove('active'));
+                if (sound === this.ambientSound || sound === 'none') {
+                    this.stopAmbient();
+                    this.ambientSound = 'none';
+                    document.querySelector('.ambient-btn[data-sound="none"]').classList.add('active');
+                } else {
+                    btn.classList.add('active');
+                    this.ambientSound = sound;
+                    this.playAmbient(sound);
+                }
+            });
+        });
+
+        const slider = document.getElementById('ambientVolume');
+        if (slider) {
+            slider.addEventListener('input', () => {
+                this.ambientVolume = slider.value / 100;
+                if (this.ambientGain) this.ambientGain.gain.value = this.ambientVolume;
+            });
+        }
+    }
+
+    _getAudioCtx() {
+        if (!this.ambientCtx || this.ambientCtx.state === 'closed') {
+            this.ambientCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ambientCtx.state === 'suspended') this.ambientCtx.resume();
+        return this.ambientCtx;
+    }
+
+    stopAmbient() {
+        for (const n of this.ambientNodes) {
+            try { n.stop(); } catch {}
+            try { n.disconnect(); } catch {}
+        }
+        this.ambientNodes = [];
+        if (this.ambientGain) {
+            try { this.ambientGain.disconnect(); } catch {}
+            this.ambientGain = null;
+        }
+    }
+
+    playAmbient(type) {
+        this.stopAmbient();
+        const ctx = this._getAudioCtx();
+        this.ambientGain = ctx.createGain();
+        this.ambientGain.gain.value = this.ambientVolume;
+        this.ambientGain.connect(ctx.destination);
+
+        if (type === 'whitenoise') this._genWhiteNoise(ctx);
+        else if (type === 'rain') this._genRain(ctx);
+        else if (type === 'forest') this._genForest(ctx);
+        else if (type === 'cafe') this._genCafe(ctx);
+    }
+
+    _genWhiteNoise(ctx) {
+        const bufferSize = 2 * ctx.sampleRate;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 1200;
+
+        src.connect(lp);
+        lp.connect(this.ambientGain);
+        src.start();
+        this.ambientNodes.push(src);
+    }
+
+    _genRain(ctx) {
+        const bufferSize = 4 * ctx.sampleRate;
+        const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+            const data = buffer.getChannelData(ch);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (0.3 + 0.7 * Math.random());
+            }
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 800;
+        bp.Q.value = 0.5;
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 3000;
+
+        src.connect(bp);
+        bp.connect(lp);
+        lp.connect(this.ambientGain);
+        src.start();
+        this.ambientNodes.push(src);
+
+        const drip = ctx.createBufferSource();
+        const dripBuf = ctx.createBuffer(1, 2 * ctx.sampleRate, ctx.sampleRate);
+        const dripData = dripBuf.getChannelData(0);
+        for (let i = 0; i < dripBuf.length; i++) {
+            const t = i / ctx.sampleRate;
+            const burst = Math.sin(t * 120 * Math.PI * 2) * Math.exp(-t * 8) * (Math.random() > 0.97 ? 1 : 0);
+            dripData[i] = burst * 0.3 + (Math.random() * 2 - 1) * 0.02;
+        }
+        drip.buffer = dripBuf;
+        drip.loop = true;
+        const dripFilter = ctx.createBiquadFilter();
+        dripFilter.type = 'highpass';
+        dripFilter.frequency.value = 2000;
+        drip.connect(dripFilter);
+        dripFilter.connect(this.ambientGain);
+        drip.start();
+        this.ambientNodes.push(drip);
+    }
+
+    _genForest(ctx) {
+        const bufferSize = 4 * ctx.sampleRate;
+        const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+            const data = buffer.getChannelData(ch);
+            for (let i = 0; i < bufferSize; i++) {
+                const t = i / ctx.sampleRate;
+                const wind = Math.sin(t * 0.3) * 0.4 + 0.6;
+                data[i] = (Math.random() * 2 - 1) * 0.15 * wind;
+                if (Math.random() > 0.9997) {
+                    const chirpLen = Math.floor(0.1 * ctx.sampleRate);
+                    const freq = 2000 + Math.random() * 3000;
+                    for (let j = 0; j < chirpLen && (i + j) < bufferSize; j++) {
+                        data[i + j] += Math.sin(j / ctx.sampleRate * freq * Math.PI * 2) * Math.exp(-j / chirpLen * 4) * 0.2;
+                    }
+                }
+            }
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 4000;
+        src.connect(lp);
+        lp.connect(this.ambientGain);
+        src.start();
+        this.ambientNodes.push(src);
+    }
+
+    _genCafe(ctx) {
+        const bufferSize = 6 * ctx.sampleRate;
+        const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+            const data = buffer.getChannelData(ch);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.12;
+                if (Math.random() > 0.9999) {
+                    const clink = Math.floor(0.05 * ctx.sampleRate);
+                    const freq = 4000 + Math.random() * 2000;
+                    for (let j = 0; j < clink && (i + j) < bufferSize; j++) {
+                        data[i + j] += Math.sin(j / ctx.sampleRate * freq * Math.PI * 2) * Math.exp(-j / clink * 6) * 0.15;
+                    }
+                }
+            }
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 600;
+        bp.Q.value = 0.3;
+        src.connect(bp);
+        bp.connect(this.ambientGain);
+        src.start();
+        this.ambientNodes.push(src);
     }
 }

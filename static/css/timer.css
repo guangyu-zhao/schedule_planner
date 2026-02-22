@@ -156,6 +156,152 @@
 .tr-delete:hover { background: var(--danger-light); color: var(--danger); }
 
 .timer-ring-wrap.completed .timer-ring-progress { stroke: var(--success) !important; }
+.timer-ring-wrap.break-mode .timer-ring-progress { stroke: var(--success) !important; }
+.timer-ring-wrap.break-mode .timer-display { color: var(--success); }
+
+/* Pomodoro Panel */
+.pomodoro-panel {
+    width: 360px;
+    max-width: 90%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.pomodoro-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pomo-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-light);
+    transition: all 0.2s;
+}
+.pomo-dot.filled {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.pomo-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+    white-space: nowrap;
+}
+.pomodoro-settings {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.auto-break-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.auto-break-toggle input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+.pomo-reset-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.pomo-reset-btn:hover {
+    border-color: var(--accent-light);
+    color: var(--accent);
+}
+
+/* Ambient Sound Panel */
+.ambient-sound-panel {
+    width: 360px;
+    max-width: 90%;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: 8px;
+}
+.ambient-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-align: center;
+}
+.ambient-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+.ambient-btn {
+    width: 48px;
+    height: 40px;
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ambient-btn:hover { border-color: var(--accent-light); background: var(--accent-bg); }
+.ambient-btn.active {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+}
+.ambient-volume {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ambient-vol-label { font-size: 14px; flex-shrink: 0; }
+.ambient-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    outline: none;
+}
+.ambient-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.ambient-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.ambient-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
 
 @media (max-width: 900px) {
     .timer-page-inner { flex-direction: column; }

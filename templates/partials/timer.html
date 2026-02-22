@@ -21,7 +21,7 @@
         <div class="timer-main">
             <div class="timer-setup" id="timerSetup">
                 <input type="text" class="timer-task-input" id="timerTaskName"
-                       placeholder="输入任务名称..." maxlength="60">
+                       placeholder="输入任务名称..." maxlength="200">
                 <div class="timer-ring-wrap">
                     <svg class="timer-ring" width="280" height="280" viewBox="0 0 280 280">
                         <circle cx="140" cy="140" r="126" fill="none" stroke="var(--border-color)" stroke-width="7" />
@@ -52,6 +52,30 @@
                 <button class="ctrl-btn ctrl-add" id="timerAdd5">+5分</button>
                 <button class="ctrl-btn ctrl-add" id="timerAdd30">+30分</button>
                 <button class="ctrl-btn ctrl-stop" id="timerStopBtn">⏹ 停止</button>
+            </div>
+            <div class="pomodoro-panel">
+                <div class="pomodoro-indicator" id="pomodoroIndicator"></div>
+                <div class="pomodoro-settings">
+                    <label class="auto-break-toggle">
+                        <input type="checkbox" id="autoBreakToggle" checked>
+                        <span>自动休息（短5分/长15分）</span>
+                    </label>
+                    <button class="pomo-reset-btn" id="resetPomodoroBtn" title="重置番茄钟计数">↺ 重置</button>
+                </div>
+            </div>
+            <div class="ambient-sound-panel">
+                <div class="ambient-header">🎵 环境音</div>
+                <div class="ambient-buttons">
+                    <button class="ambient-btn" data-sound="none" title="静音">🔇</button>
+                    <button class="ambient-btn" data-sound="rain" title="雨声">🌧️</button>
+                    <button class="ambient-btn" data-sound="forest" title="森林">🌲</button>
+                    <button class="ambient-btn" data-sound="cafe" title="咖啡馆">☕</button>
+                    <button class="ambient-btn" data-sound="whitenoise" title="白噪音">〰️</button>
+                </div>
+                <div class="ambient-volume">
+                    <span class="ambient-vol-label">🔊</span>
+                    <input type="range" id="ambientVolume" min="0" max="100" value="30" class="ambient-slider">
+                </div>
             </div>
         </div>
     </div>

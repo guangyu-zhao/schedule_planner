@@ -1,138 +1,398 @@
-from flask import Blueprint, request, jsonify
+import calendar
+import re
+from datetime import datetime, timedelta
+from flask import Blueprint, request, jsonify, g
 from database import get_db
+from auth_utils import login_required
 
 events_bp = Blueprint("events", __name__)
 
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+
+
+def _validate_event_data(data, require_all=True):
+    if not data:
+        return "请求数据不能为空"
+    title = data.get("title", "").strip() if require_all else data.get("title", "ok")
+    if require_all and not title:
+        return "标题不能为空"
+    if title and len(title) > 200:
+        return "标题不能超过 200 个字符"
+    desc = data.get("description", "")
+    if desc and len(desc) > 5000:
+        return "备注不能超过 5000 个字符"
+    date = data.get("date", "")
+    if require_all and not DATE_RE.match(date):
+        return "日期格式不正确"
+    start_time = data.get("start_time", "")
+    end_time = data.get("end_time", "")
+    if require_all and (not TIME_RE.match(start_time) or not TIME_RE.match(end_time)):
+        return "时间格式不正确"
+    if require_all and start_time >= end_time:
+        return "结束时间必须晚于开始时间"
+    return None
+
 
 @events_bp.route("/api/events", methods=["GET"])
+@login_required
 def get_events():
-    start = request.args.get("start")
-    end = request.args.get("end")
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    if not DATE_RE.match(start) or not DATE_RE.match(end):
+        return jsonify({"error": "日期参数格式不正确"}), 400
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE date >= ? AND date <= ? ORDER BY date, start_time",
-        (start, end),
+        "SELECT * FROM events WHERE user_id=? AND date >= ? AND date <= ? ORDER BY date, start_time",
+        (g.user_id, start, end),
     ).fetchall()
-    conn.close()
     return jsonify([dict(e) for e in events])
 
 
 @events_bp.route("/api/events", methods=["POST"])
+@login_required
 def create_event():
     data = request.json
-    col_type = data.get("col_type", "plan")
-    conn = get_db()
+    if not data:
+        return jsonify({"error": "请求数据不能为空"}), 400
+    err = _validate_event_data(data)
+    if err:
+        return jsonify({"error": err}), 400
 
+    col_type = data.get("col_type", "plan")
+    if col_type not in ("plan", "actual"):
+        return jsonify({"error": "无效的列类型"}), 400
+
+    recur_rule = data.get("recur_rule") or None
+    if recur_rule and recur_rule not in ("daily", "weekdays", "weekly", "monthly"):
+        recur_rule = None
+
+    conn = get_db()
     cursor = conn.execute(
-        """INSERT INTO events (title, description, date, start_time, end_time,
-           color, category, priority, col_type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO events (user_id, title, description, date, start_time, end_time,
+           color, category, priority, col_type, recur_rule)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            data["title"],
+            g.user_id,
+            data["title"].strip(),
             data.get("description", ""),
             data["date"],
             data["start_time"],
             data["end_time"],
-            data["color"],
+            data.get("color", "#6c5ce7"),
             data.get("category", "工作"),
-            data.get("priority", 1),
+            int(data.get("priority", 1)),
             col_type,
+            recur_rule,
         ),
     )
     conn.commit()
-    plan_id = cursor.lastrowid
+    new_id = cursor.lastrowid
 
-    actual_event = None
-    if col_type == "plan":
-        cursor2 = conn.execute(
-            """INSERT INTO events (title, description, date, start_time, end_time,
-               color, category, priority, col_type, link_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'actual', ?)""",
-            (
-                data["title"],
-                data.get("description", ""),
-                data["date"],
-                data["start_time"],
-                data["end_time"],
-                data["color"],
-                data.get("category", "工作"),
-                data.get("priority", 1),
-                plan_id,
-            ),
-        )
-        actual_id = cursor2.lastrowid
-        conn.execute("UPDATE events SET link_id=? WHERE id=?", (actual_id, plan_id))
-        conn.commit()
-        actual_event = dict(
-            conn.execute("SELECT * FROM events WHERE id=?", (actual_id,)).fetchone()
-        )
-
-    plan_event = dict(
-        conn.execute("SELECT * FROM events WHERE id=?", (plan_id,)).fetchone()
+    new_event = dict(
+        conn.execute("SELECT * FROM events WHERE id=?", (new_id,)).fetchone()
     )
-    conn.close()
-
-    if actual_event:
-        return jsonify({"plan": plan_event, "actual": actual_event}), 201
-    return jsonify({"plan": plan_event}), 201
+    return jsonify({"event": new_event}), 201
 
 
 @events_bp.route("/api/events/<int:event_id>", methods=["PUT"])
+@login_required
 def update_event(event_id):
     data = request.json
+    if not data:
+        return jsonify({"error": "请求数据不能为空"}), 400
+    err = _validate_event_data(data)
+    if err:
+        return jsonify({"error": err}), 400
+
     conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
+    ).fetchone()
+    if not existing:
+        return jsonify({"error": "事件不存在"}), 404
+
+    recur_rule = data.get("recur_rule") or None
+    if recur_rule and recur_rule not in ("daily", "weekdays", "weekly", "monthly"):
+        recur_rule = None
+
     conn.execute(
         """UPDATE events SET title=?, description=?, date=?, start_time=?, end_time=?,
-           color=?, category=?, priority=?, completed=?, updated_at=datetime('now','localtime')
-           WHERE id=?""",
+           color=?, category=?, priority=?, completed=?, recur_rule=?,
+           updated_at=datetime('now','localtime')
+           WHERE id=? AND user_id=?""",
         (
-            data["title"],
+            data["title"].strip(),
             data.get("description", ""),
             data["date"],
             data["start_time"],
             data["end_time"],
-            data["color"],
+            data.get("color", "#6c5ce7"),
             data.get("category", "工作"),
-            data.get("priority", 1),
-            data.get("completed", 0),
+            int(data.get("priority", 1)),
+            int(data.get("completed", 0)),
+            recur_rule,
             event_id,
+            g.user_id,
         ),
     )
     conn.commit()
-    event = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-    conn.close()
+    event = conn.execute("SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)).fetchone()
     return jsonify(dict(event))
 
 
 @events_bp.route("/api/events/batch", methods=["PUT"])
+@login_required
 def batch_update_events():
     items = request.json
+    if not items or not isinstance(items, list):
+        return jsonify({"error": "请求数据格式不正确"}), 400
     conn = get_db()
     results = []
     for item in items:
+        if not isinstance(item, dict) or "id" not in item:
+            continue
+        try:
+            item["id"] = int(item["id"])
+        except (ValueError, TypeError):
+            continue
+        start_time = item.get("start_time", "")
+        end_time = item.get("end_time", "")
+        if not TIME_RE.match(start_time) or not TIME_RE.match(end_time):
+            continue
+        if start_time >= end_time:
+            continue
         conn.execute(
-            "UPDATE events SET start_time=?, end_time=?, updated_at=datetime('now','localtime') WHERE id=?",
-            (item["start_time"], item["end_time"], item["id"]),
+            "UPDATE events SET start_time=?, end_time=?, updated_at=datetime('now','localtime') WHERE id=? AND user_id=?",
+            (start_time, end_time, item["id"], g.user_id),
         )
     conn.commit()
     for item in items:
+        if not isinstance(item, dict) or "id" not in item:
+            continue
         row = conn.execute(
-            "SELECT * FROM events WHERE id=?", (item["id"],)
+            "SELECT * FROM events WHERE id=? AND user_id=?", (item["id"], g.user_id)
         ).fetchone()
         if row:
             results.append(dict(row))
-    conn.close()
     return jsonify(results)
 
 
 @events_bp.route("/api/events/<int:event_id>", methods=["DELETE"])
+@login_required
 def delete_event(event_id):
     conn = get_db()
-    event = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-    event_data = dict(event) if event else None
-    conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
-    if event and event["link_id"]:
-        conn.execute("DELETE FROM events WHERE id = ?", (event["link_id"],))
+    event = conn.execute("SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)).fetchone()
+    if not event:
+        return jsonify({"error": "事件不存在"}), 404
+    event_data = dict(event)
+
+    conn.execute("DELETE FROM events WHERE id=? AND user_id=?", (event_id, g.user_id))
     conn.commit()
-    conn.close()
     return jsonify({"success": True, "event": event_data})
+
+
+
+@events_bp.route("/api/events/<int:event_id>/duplicate", methods=["POST"])
+@login_required
+def duplicate_event(event_id):
+    """Copy an event (and its linked counterpart) to a target date."""
+    data = request.json or {}
+    target_date = data.get("target_date", "")
+    if not DATE_RE.match(target_date):
+        return jsonify({"error": "目标日期格式不正确"}), 400
+
+    conn = get_db()
+    event = conn.execute(
+        "SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
+    ).fetchone()
+    if not event:
+        return jsonify({"error": "事件不存在"}), 404
+
+    src = dict(event)
+    col_type = src.get("col_type", "plan")
+
+    if col_type == "actual" and src.get("link_id"):
+        plan = conn.execute(
+            "SELECT * FROM events WHERE id=? AND user_id=?", (src["link_id"], g.user_id)
+        ).fetchone()
+        if plan:
+            src = dict(plan)
+            col_type = "plan"
+
+    cursor = conn.execute(
+        """INSERT INTO events (user_id, title, description, date, start_time, end_time,
+           color, category, priority, col_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (g.user_id, src["title"], src.get("description", ""), target_date,
+         src["start_time"], src["end_time"], src["color"],
+         src.get("category", "其他"), src.get("priority", 2), "plan"),
+    )
+    plan_id = cursor.lastrowid
+
+    cursor2 = conn.execute(
+        """INSERT INTO events (user_id, title, description, date, start_time, end_time,
+           color, category, priority, col_type, link_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'actual', ?)""",
+        (g.user_id, src["title"], src.get("description", ""), target_date,
+         src["start_time"], src["end_time"], src["color"],
+         src.get("category", "其他"), src.get("priority", 2), plan_id),
+    )
+    actual_id = cursor2.lastrowid
+    conn.execute("UPDATE events SET link_id=? WHERE id=?", (actual_id, plan_id))
+    conn.commit()
+
+    plan_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (plan_id,)).fetchone())
+    actual_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (actual_id,)).fetchone())
+    return jsonify({"plan": plan_event, "actual": actual_event}), 201
+
+
+@events_bp.route("/api/events/generate-recurring", methods=["POST"])
+@login_required
+def generate_recurring():
+    """Generate instances for recurring events within a date range."""
+    data = request.json or {}
+    start = data.get("start", "")
+    end = data.get("end", "")
+    if not DATE_RE.match(start) or not DATE_RE.match(end):
+        return jsonify({"error": "日期参数格式不正确"}), 400
+
+    conn = get_db()
+    recurring = conn.execute(
+        "SELECT * FROM events WHERE user_id=? AND recur_rule IS NOT NULL AND col_type='plan'",
+        (g.user_id,),
+    ).fetchall()
+
+    created = 0
+    start_dt = datetime.strptime(start, "%Y-%m-%d")
+    end_dt = datetime.strptime(end, "%Y-%m-%d")
+
+    for evt in recurring:
+        rule = evt["recur_rule"]
+        base_date = datetime.strptime(evt["date"], "%Y-%m-%d")
+        dates = _expand_recur(rule, base_date, start_dt, end_dt)
+
+        for d in dates:
+            ds = d.strftime("%Y-%m-%d")
+            existing = conn.execute(
+                "SELECT id FROM events WHERE user_id=? AND date=? AND recur_parent_id=? AND col_type='plan'",
+                (g.user_id, ds, evt["id"]),
+            ).fetchone()
+            if existing:
+                continue
+
+            conn.execute(
+                """INSERT INTO events (user_id, title, description, date, start_time, end_time,
+                   color, category, priority, col_type, recur_parent_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'plan', ?)""",
+                (g.user_id, evt["title"], evt["description"], ds,
+                 evt["start_time"], evt["end_time"], evt["color"],
+                 evt["category"], evt["priority"], evt["id"]),
+            )
+            created += 1
+
+    if created > 0:
+        conn.commit()
+    return jsonify({"created": created})
+
+
+def _expand_recur(rule, base_date, start_dt, end_dt):
+    """Return list of dates that match a recurrence rule within a range."""
+    dates = []
+    d = base_date + timedelta(days=1)
+    limit = 90
+    count = 0
+
+    while d <= end_dt and count < limit:
+        if d >= start_dt:
+            if rule == "daily":
+                dates.append(d)
+            elif rule == "weekdays":
+                if d.weekday() < 5:
+                    dates.append(d)
+            elif rule == "weekly":
+                if d.weekday() == base_date.weekday():
+                    dates.append(d)
+            elif rule == "monthly":
+                if d.day == base_date.day:
+                    dates.append(d)
+        if rule == "monthly":
+            if d.month == (d + timedelta(days=1)).month:
+                d += timedelta(days=1)
+            else:
+                next_first = d.replace(day=1) + timedelta(days=32)
+                next_month = next_first.replace(day=1)
+                max_day = calendar.monthrange(next_month.year, next_month.month)[1]
+                d = next_month.replace(day=min(base_date.day, max_day))
+        else:
+            d += timedelta(days=1)
+        count += 1
+
+    return dates
+
+
+@events_bp.route("/api/events/trash", methods=["GET"])
+@login_required
+def get_trash():
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT * FROM deleted_events WHERE user_id=?
+           ORDER BY deleted_at DESC LIMIT 200""",
+        (g.user_id,),
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@events_bp.route("/api/events/trash/<int:item_id>/restore", methods=["POST"])
+@login_required
+def restore_from_trash(item_id):
+    conn = get_db()
+    item = conn.execute(
+        "SELECT * FROM deleted_events WHERE id=? AND user_id=?", (item_id, g.user_id)
+    ).fetchone()
+    if not item:
+        return jsonify({"error": "回收站中不存在此事件"}), 404
+
+    cursor = conn.execute(
+        """INSERT INTO events (user_id, title, description, date, start_time, end_time,
+           color, category, priority, completed, col_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (g.user_id, item["title"], item["description"], item["date"],
+         item["start_time"], item["end_time"], item["color"],
+         item["category"], item["priority"], item["completed"], item["col_type"]),
+    )
+    conn.execute("DELETE FROM deleted_events WHERE id=?", (item_id,))
+    conn.commit()
+
+    new_event = conn.execute("SELECT * FROM events WHERE id=?", (cursor.lastrowid,)).fetchone()
+    return jsonify({"success": True, "event": dict(new_event)})
+
+
+@events_bp.route("/api/events/trash", methods=["DELETE"])
+@login_required
+def empty_trash():
+    conn = get_db()
+    conn.execute("DELETE FROM deleted_events WHERE user_id=?", (g.user_id,))
+    conn.commit()
+    return jsonify({"success": True})
+
+
+@events_bp.route("/api/events/search", methods=["GET"])
+@login_required
+def search_events():
+    """Search events by keyword in title/description."""
+    q = (request.args.get("q") or "").strip()
+    if not q or len(q) < 1:
+        return jsonify([])
+    try:
+        limit = min(int(request.args.get("limit", 50)), 200)
+    except (ValueError, TypeError):
+        limit = 50
+    conn = get_db()
+    keyword = f"%{q.replace('%', '').replace('_', '')}%"
+    events = conn.execute(
+        """SELECT * FROM events WHERE user_id=? AND (title LIKE ? OR description LIKE ?)
+           ORDER BY date DESC, start_time LIMIT ?""",
+        (g.user_id, keyword, keyword, limit),
+    ).fetchall()
+    return jsonify([dict(e) for e in events])

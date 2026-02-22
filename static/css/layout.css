@@ -39,6 +39,29 @@
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
 .top-bar-spacer { flex: 1; }
 
+/* ===== Offline Banner ===== */
+.offline-banner {
+    display: none; padding: 6px 16px; text-align: center;
+    background: var(--warning); color: #1a1a2e;
+    font-size: 13px; font-weight: 500; flex-shrink: 0;
+}
+.offline-banner.active { display: block; }
+
 /* ===== Pages ===== */
 .page { display: none; flex-direction: column; flex: 1; overflow: hidden; }
 .page.active { display: flex; }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+    .top-bar { padding: 0 12px; gap: 8px; height: 48px; }
+    .logo { font-size: 16px; }
+    .tab-nav { margin-left: 8px; gap: 2px; }
+    .tab { padding: 6px 12px; font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+    .top-bar { padding: 0 8px; gap: 4px; }
+    .logo { display: none; }
+    .tab-nav { margin-left: 0; }
+    .tab { padding: 6px 10px; font-size: 12px; }
+}

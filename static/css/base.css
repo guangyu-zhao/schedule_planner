@@ -17,6 +17,7 @@
     --warning: #fdcb6e;
     --today-bg: #f8f5ff;
     --selection-bg: rgba(108, 92, 231, 0.15);
+    --bg-hover: rgba(0, 0, 0, 0.04);
     --slot-height: 28px;
     --time-gutter-width: 56px;
     --top-bar-height: 56px;
@@ -26,6 +27,48 @@
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 16px;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #1e1e2e;
+    --bg-secondary: #181825;
+    --bg-tertiary: #313244;
+    --text-primary: #cdd6f4;
+    --text-secondary: #a6adc8;
+    --text-muted: #6c7086;
+    --border-color: #313244;
+    --border-light: #2a2a3c;
+    --accent: #b4befe;
+    --accent-light: #cba6f7;
+    --accent-bg: rgba(180, 190, 254, 0.1);
+    --danger: #f38ba8;
+    --danger-light: rgba(243, 139, 168, 0.15);
+    --success: #a6e3a1;
+    --success-light: rgba(166, 227, 161, 0.15);
+    --warning: #f9e2af;
+    --today-bg: rgba(180, 190, 254, 0.08);
+    --selection-bg: rgba(180, 190, 254, 0.2);
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .top-bar {
+    background: #11111b;
+}
+
+[data-theme="dark"] .markdown-body pre {
+    background: #11111b;
+    color: #cdd6f4;
+}
+
+[data-theme="dark"] .user-dropdown {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .event:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

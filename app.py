@@ -10,10 +10,11 @@ from flask import Flask, jsonify, request, g
 
 from config import (
     SECRET_KEY, PERMANENT_SESSION_LIFETIME, MAX_CONTENT_LENGTH,
-    UPLOAD_FOLDER, LOG_LEVEL,
+    LOG_LEVEL,
 )
 from database import init_db, get_db, get_db_direct, optimize_db, backup_db
 from routes import register_blueprints
+from storage import get_storage
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -32,7 +33,7 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 if os.environ.get("FLASK_ENV") == "production" or os.environ.get("HTTPS") == "1":
     app.config["SESSION_COOKIE_SECURE"] = True
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+get_storage()
 
 init_db()
 optimize_db()

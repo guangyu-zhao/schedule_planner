@@ -2,11 +2,11 @@ import os
 import secrets
 import logging
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "planner.db")
+from dotenv import load_dotenv
 
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-AVATAR_FOLDER = os.path.join(UPLOAD_FOLDER, "avatars")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+DB_PATH = os.path.join(BASE_DIR, "planner.db")
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 

@@ -83,6 +83,7 @@ Supports 8 languages: **English**, **简体中文**, **繁體中文**, **França
 ```bash
 git clone https://github.com/<your-username>/schedule_planner.git
 cd schedule_planner
+cp .env.example .env        # create config file, edit as needed
 pip install -r requirements.txt
 python app.py
 ```
@@ -103,12 +104,31 @@ pip install waitress
 waitress-serve --port=5555 app:app
 ```
 
-### Environment Variables
+### Configuration
+
+All settings are managed through the **`.env`** file in the project root (loaded automatically via `python-dotenv`). Copy `.env.example` to `.env` and edit as needed; restart the server to apply changes.
+
+#### Server
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FLASK_ENV` | Runtime mode (`development` / `production`) | `development` |
+| `FLASK_DEBUG` | Enable Flask debug mode | `false` |
+| `HOST` | Listen address | `127.0.0.1` |
+| `PORT` | Listen port | `5555` |
+| `HTTPS` | Set to `1` to mark session cookies as Secure | `0` |
+| `LOG_LEVEL` | Logging level (`DEBUG` / `INFO` / `WARNING` / `ERROR`) | `INFO` |
+
+#### Security
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SECRET_KEY` | Session signing key (must set in production) | Auto-generated and saved to `.secret_key` |
-| `PORT` | Server port | `5555` |
+
+#### Mail
+
+| Variable | Description | Default |
+|----------|-------------|---------|
 | `MAIL_SERVER` | SMTP server address | `smtp.gmail.com` |
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | SMTP username | Empty (codes printed to console) |
@@ -116,20 +136,38 @@ waitress-serve --port=5555 app:app
 | `MAIL_DEFAULT_SENDER` | Sender email address | `noreply@schedule-planner.com` |
 | `MAIL_USE_TLS` | Enable TLS | `true` |
 
+#### File Storage
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STORAGE_TYPE` | Storage backend: `local` (filesystem) or `oss` (Alibaba Cloud OSS) | `local` |
+| `UPLOAD_FOLDER` | Local upload directory (effective when `STORAGE_TYPE=local`) | `uploads/` under project root |
+| `OSS_ACCESS_KEY_ID` | Alibaba Cloud OSS Access Key ID | Empty |
+| `OSS_ACCESS_KEY_SECRET` | Alibaba Cloud OSS Access Key Secret | Empty |
+| `OSS_ENDPOINT` | OSS endpoint (e.g. `https://oss-cn-hangzhou.aliyuncs.com`) | Empty |
+| `OSS_BUCKET` | OSS bucket name | Empty |
+| `OSS_BASE_URL` | OSS public base URL for file access | Empty |
+
+> **Switch to OSS**: set `STORAGE_TYPE=oss` and fill in the `OSS_*` variables — no code changes needed.
+
 ## Project Structure
 
 ```
 schedule_planner/
+│
+├── .env                    # Environment configuration (not tracked in git)
+├── .env.example            # Configuration template — copy to .env to start
 │
 ├── app.py                  # Application entry point — creates the Flask app,
 │                           #   registers middleware (CSRF check, security
 │                           #   headers, rate limiting), periodic maintenance
 │                           #   (DB optimize & backup), and error handlers.
 │
-├── config.py               # Centralized configuration — reads SECRET_KEY
-│                           #   from env or .secret_key file, defines mail
-│                           #   settings, upload paths, session lifetime,
-│                           #   avatar constraints, and code expiry times.
+├── config.py               # Centralized configuration — loads .env via
+│                           #   python-dotenv, reads SECRET_KEY from env or
+│                           #   .secret_key file, defines mail settings,
+│                           #   session lifetime, avatar constraints, and
+│                           #   code expiry times.
 │
 ├── database.py             # Database layer — SQLite connection management,
 │                           #   full schema creation (users, events,
@@ -144,6 +182,17 @@ schedule_planner/
 │                           #   code generation, SMTP email sending, code
 │                           #   storage/verification, and reset session
 │                           #   expiry check.
+│
+├── storage/                # Pluggable file-storage abstraction
+│   ├── __init__.py         # Factory function get_storage() — returns the
+│   │                       #   singleton Storage instance based on the
+│   │                       #   STORAGE_TYPE environment variable.
+│   ├── base.py             # Abstract Storage interface — defines save(),
+│   │                       #   delete(), exists(), and url() methods.
+│   ├── local.py            # LocalStorage — stores files on the local
+│   │                       #   filesystem under UPLOAD_FOLDER.
+│   └── oss.py              # OSSStorage — Alibaba Cloud OSS backend
+│                           #   (structure ready; requires oss2 SDK).
 │
 ├── requirements.txt        # Python dependencies
 ├── planner.db              # SQLite database (auto-created on first run)
@@ -256,7 +305,7 @@ schedule_planner/
 │                           #   creation (bar, doughnut, line charts).
 │
 └── uploads/
-    └── avatars/            # User-uploaded avatar images
+    └── avatars/            # User-uploaded avatar images (local storage)
 ```
 
 ## API Endpoints

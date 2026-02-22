@@ -1,17 +1,17 @@
 import csv
 import io
-import os
 import re
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, request, jsonify, g, session, send_from_directory, Response
+from flask import Blueprint, request, jsonify, g, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-from config import AVATAR_FOLDER, ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE
+from config import ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE
 from database import get_db
 from auth_utils import login_required
+from storage import get_storage
 
 user_bp = Blueprint("user", __name__)
 
@@ -91,11 +91,11 @@ def upload_avatar():
     if not file.filename or not _allowed_file(file.filename):
         return jsonify({"error": "不支持的文件格式，请上传 PNG/JPG/GIF/WebP"}), 400
 
-    os.makedirs(AVATAR_FOLDER, exist_ok=True)
+    storage = get_storage()
 
     ext = file.filename.rsplit(".", 1)[1].lower()
     filename = f"{g.user_id}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join(AVATAR_FOLDER, filename)
+    relative_path = f"avatars/{filename}"
 
     try:
         from PIL import Image
@@ -105,7 +105,7 @@ def upload_avatar():
             img = img.convert("RGB")
             ext = "jpg"
             filename = f"{g.user_id}_{uuid.uuid4().hex[:8]}.{ext}"
-            filepath = os.path.join(AVATAR_FOLDER, filename)
+            relative_path = f"avatars/{filename}"
 
         width, height = img.size
         side = min(width, height)
@@ -113,22 +113,20 @@ def upload_avatar():
         top = (height - side) // 2
         img = img.crop((left, top, left + side, top + side))
         img = img.resize(AVATAR_MAX_SIZE, Image.LANCZOS)
-        img.save(filepath, quality=90)
+
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG" if ext == "jpg" else ext.upper(), quality=90)
+        storage.save(buf.getvalue(), relative_path)
     except Exception:
         file.stream.seek(0)
-        file.save(filepath)
+        storage.save(file.stream, relative_path)
 
     conn = get_db()
     old = conn.execute(
         "SELECT avatar FROM users WHERE id=?", (g.user_id,)
     ).fetchone()
     if old and old["avatar"]:
-        old_path = os.path.join(AVATAR_FOLDER, old["avatar"])
-        if os.path.exists(old_path):
-            try:
-                os.remove(old_path)
-            except OSError:
-                pass
+        storage.delete(f"avatars/{old['avatar']}")
 
     conn.execute(
         "UPDATE users SET avatar=?, updated_at=datetime('now','localtime') WHERE id=?",
@@ -136,13 +134,14 @@ def upload_avatar():
     )
     conn.commit()
 
-    return jsonify({"avatar": filename, "url": f"/uploads/avatars/{filename}"})
+    return jsonify({"avatar": filename, "url": storage.url(relative_path)})
 
 
 @user_bp.route("/uploads/avatars/<filename>")
 def serve_avatar(filename):
     filename = secure_filename(filename)
-    return send_from_directory(AVATAR_FOLDER, filename)
+    storage = get_storage()
+    return storage.serve(f"avatars/{filename}")
 
 
 @user_bp.route("/api/user/settings", methods=["GET"])
@@ -487,12 +486,7 @@ def delete_account():
     conn.commit()
 
     if user["avatar"]:
-        avatar_path = os.path.join(AVATAR_FOLDER, user["avatar"])
-        if os.path.exists(avatar_path):
-            try:
-                os.remove(avatar_path)
-            except OSError:
-                pass
+        get_storage().delete(f"avatars/{user['avatar']}")
 
     session.clear()
     return jsonify({"success": True, "message": "账户已删除"})

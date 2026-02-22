@@ -83,6 +83,7 @@
 ```bash
 git clone https://github.com/<your-username>/schedule_planner.git
 cd schedule_planner
+cp .env.example .env        # 创建配置文件，按需修改
 pip install -r requirements.txt
 python app.py
 ```
@@ -103,12 +104,31 @@ pip install waitress
 waitress-serve --port=5555 app:app
 ```
 
-### 环境变量配置
+### 配置说明
+
+所有配置项集中在项目根目录的 **`.env`** 文件中（通过 `python-dotenv` 自动加载）。首次使用时将 `.env.example` 复制为 `.env` 并按需修改，重启服务后生效。
+
+#### 服务
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `FLASK_ENV` | 运行模式（`development` / `production`） | `development` |
+| `FLASK_DEBUG` | 是否开启 Flask 调试模式 | `false` |
+| `HOST` | 监听地址 | `127.0.0.1` |
+| `PORT` | 服务端口 | `5555` |
+| `HTTPS` | 设为 `1` 时 Session Cookie 加上 Secure 标记 | `0` |
+| `LOG_LEVEL` | 日志级别（`DEBUG` / `INFO` / `WARNING` / `ERROR`） | `INFO` |
+
+#### 安全
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `SECRET_KEY` | Session 签名密钥（生产环境必须设置） | 自动生成并保存到 `.secret_key` 文件 |
-| `PORT` | 服务端口 | `5555` |
+
+#### 邮件
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
 | `MAIL_SERVER` | SMTP 邮件服务器地址 | `smtp.gmail.com` |
 | `MAIL_PORT` | SMTP 端口 | `587` |
 | `MAIL_USERNAME` | SMTP 用户名 | 空（未配置时验证码打印到控制台） |
@@ -116,19 +136,37 @@ waitress-serve --port=5555 app:app
 | `MAIL_DEFAULT_SENDER` | 发件人地址 | `noreply@schedule-planner.com` |
 | `MAIL_USE_TLS` | 是否启用 TLS | `true` |
 
+#### 文件存储
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `STORAGE_TYPE` | 存储后端：`local`（本地文件系统）或 `oss`（阿里云 OSS） | `local` |
+| `UPLOAD_FOLDER` | 本地上传目录（`STORAGE_TYPE=local` 时生效） | 项目根目录下的 `uploads/` |
+| `OSS_ACCESS_KEY_ID` | 阿里云 OSS Access Key ID | 空 |
+| `OSS_ACCESS_KEY_SECRET` | 阿里云 OSS Access Key Secret | 空 |
+| `OSS_ENDPOINT` | OSS 端点（如 `https://oss-cn-hangzhou.aliyuncs.com`） | 空 |
+| `OSS_BUCKET` | OSS 存储桶名称 | 空 |
+| `OSS_BASE_URL` | OSS 公网访问基础 URL | 空 |
+
+> **切换到 OSS**：只需将 `STORAGE_TYPE=oss` 并填写 `OSS_*` 相关配置，无需修改任何代码。
+
 ## 项目结构
 
 ```
 schedule_planner/
+│
+├── .env                    # 环境配置文件（不纳入 git 版本管理）
+├── .env.example            # 配置文件模板 — 复制为 .env 即可使用
 │
 ├── app.py                  # 应用入口 — 创建 Flask 应用，注册中间件
 │                           #   （CSRF 检查、安全响应头、速率限制），
 │                           #   周期性维护（数据库优化与备份），
 │                           #   以及错误处理器。
 │
-├── config.py               # 集中配置 — 从环境变量或 .secret_key 文件
-│                           #   读取密钥，定义邮件、上传路径、Session
-│                           #   有效期、头像约束、验证码过期时间等。
+├── config.py               # 集中配置 — 通过 python-dotenv 加载 .env，
+│                           #   从环境变量或 .secret_key 文件读取密钥，
+│                           #   定义邮件、Session 有效期、头像约束、
+│                           #   验证码过期时间等。
 │
 ├── database.py             # 数据库层 — SQLite 连接管理，完整的表结构
 │                           #   创建（users、events、timer_records、
@@ -141,6 +179,16 @@ schedule_planner/
 │                           #   get_current_user()、验证码生成、
 │                           #   SMTP 邮件发送、验证码存储/校验、
 │                           #   重置会话过期检查。
+│
+├── storage/                # 可插拔文件存储抽象层
+│   ├── __init__.py         # 工厂函数 get_storage() — 根据环境变量
+│   │                       #   STORAGE_TYPE 返回单例 Storage 实例。
+│   ├── base.py             # 抽象 Storage 接口 — 定义 save()、
+│   │                       #   delete()、exists()、url() 方法。
+│   ├── local.py            # LocalStorage — 将文件存储在本地文件
+│   │                       #   系统的 UPLOAD_FOLDER 目录下。
+│   └── oss.py              # OSSStorage — 阿里云 OSS 存储后端
+│                           #   （结构已就绪，需安装 oss2 SDK）。
 │
 ├── requirements.txt        # Python 依赖
 ├── planner.db              # SQLite 数据库（首次运行自动创建）
@@ -249,7 +297,7 @@ schedule_planner/
 │                           #   折线图）。
 │
 └── uploads/
-    └── avatars/            # 用户上传的头像图片
+    └── avatars/            # 用户上传的头像图片（本地存储）
 ```
 
 ## API 接口

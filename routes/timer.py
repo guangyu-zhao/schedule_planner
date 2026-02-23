@@ -1,7 +1,7 @@
 import re
 from flask import Blueprint, request, jsonify, g
 from database import get_db
-from auth_utils import login_required
+from auth_utils import login_required, validate_date
 
 timer_bp = Blueprint("timer", __name__)
 
@@ -12,7 +12,7 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 @login_required
 def get_timer_records():
     date = request.args.get("date", "")
-    if not DATE_RE.match(date):
+    if not validate_date(date):
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     records = conn.execute(
@@ -36,7 +36,7 @@ def create_timer_record():
         return jsonify({"error": "任务名称不能超过 200 个字符"}), 400
 
     date = data.get("date", "")
-    if not DATE_RE.match(date):
+    if not validate_date(date):
         return jsonify({"error": "日期格式不正确"}), 400
 
     try:
@@ -47,6 +47,10 @@ def create_timer_record():
 
     if planned_minutes < 0 or actual_seconds < 0:
         return jsonify({"error": "时间参数不能为负数"}), 400
+    if planned_minutes > 1440:
+        return jsonify({"error": "计划时长不能超过 1440 分钟（24 小时）"}), 400
+    if actual_seconds > 86400:
+        return jsonify({"error": "实际时长不能超过 86400 秒（24 小时）"}), 400
 
     conn = get_db()
     cursor = conn.execute(
@@ -81,7 +85,7 @@ def delete_timer_record(record_id):
 @login_required
 def get_timer_stats():
     date = request.args.get("date", "")
-    if not DATE_RE.match(date):
+    if not validate_date(date):
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     total = conn.execute(

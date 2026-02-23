@@ -14,7 +14,11 @@ class LocalStorage(Storage):
         os.makedirs(self._root, exist_ok=True)
 
     def _full_path(self, relative_path: str) -> str:
-        return os.path.join(self._root, relative_path)
+        root = os.path.normpath(self._root)
+        full = os.path.normpath(os.path.join(self._root, relative_path))
+        if full != root and not full.startswith(root + os.sep):
+            raise ValueError(f"Path traversal detected: {relative_path!r}")
+        return full
 
     def save(self, data: Union[bytes, IO], relative_path: str) -> str:
         full = self._full_path(relative_path)

@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from config import ALLOWED_NOTE_IMAGE_EXTENSIONS, NOTE_IMAGE_MAX_SIZE
 from database import get_db
-from auth_utils import login_required
+from auth_utils import login_required, validate_date, run_regex_with_timeout
 from storage import get_storage
 
 logger = logging.getLogger(__name__)
@@ -65,12 +65,17 @@ def upload_note_image():
         logger.warning("笔记图片处理失败: %s", e)
         return jsonify({"error": "图片处理失败，请上传有效的图片文件"}), 400
 
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO note_images (user_id, token, storage_path) VALUES (?, ?, ?)",
-        (g.user_id, token, storage_path),
-    )
-    conn.commit()
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO note_images (user_id, token, storage_path) VALUES (?, ?, ?)",
+            (g.user_id, token, storage_path),
+        )
+        conn.commit()
+    except Exception:
+        storage.delete(storage_path)
+        logger.error("保存图片记录失败，已清理存储文件: %s", storage_path)
+        return jsonify({"error": "图片保存失败，请重试"}), 500
 
     return jsonify({"token": token})
 
@@ -99,7 +104,7 @@ def notes_dates():
     """Return dates that have non-empty notes, within a date range."""
     start = request.args.get("start", "")
     end   = request.args.get("end",   "")
-    if not DATE_RE.match(start) or not DATE_RE.match(end):
+    if not validate_date(start) or not validate_date(end):
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
@@ -133,10 +138,16 @@ def search_notes():
         except re.error as exc:
             return jsonify({"error": str(exc)}), 400
         rows = conn.execute(
-            "SELECT * FROM notes WHERE user_id=? ORDER BY date DESC",
-            (g.user_id,),
+            "SELECT * FROM notes WHERE user_id=? ORDER BY date DESC LIMIT ?",
+            (g.user_id, limit * 20),
         ).fetchall()
-        return jsonify([dict(r) for r in rows if pattern.search(r["content"] or "")][:limit])
+        matched, err = run_regex_with_timeout(
+            pattern, rows,
+            [lambda r: r["content"] or ""],
+        )
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify([dict(r) for r in matched[:limit]])
 
     # Non-regex: LIKE broad filter then Python-refine
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -165,7 +176,7 @@ def search_notes():
 def list_notes():
     """Return all notes for a given date, ordered by creation time."""
     date = request.args.get("date", "")
-    if not DATE_RE.match(date):
+    if not validate_date(date):
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     rows = conn.execute(
@@ -184,7 +195,7 @@ def create_note():
         return jsonify({"error": "请求数据不能为空"}), 400
     date = data.get("date", "")
     content = data.get("content", "")
-    if not DATE_RE.match(date):
+    if not validate_date(date):
         return jsonify({"error": "日期格式不正确"}), 400
     if not content.strip():
         return jsonify({"error": "笔记内容不能为空"}), 400
@@ -220,8 +231,8 @@ def update_note(note_id):
         return jsonify({"error": "笔记不存在"}), 404
 
     conn.execute(
-        "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE id=?",
-        (content, note_id),
+        "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE id=? AND user_id=?",
+        (content, note_id, g.user_id),
     )
     conn.commit()
     return jsonify({"success": True})
@@ -238,6 +249,6 @@ def delete_note(note_id):
     if not row:
         return jsonify({"error": "笔记不存在"}), 404
 
-    conn.execute("DELETE FROM notes WHERE id=?", (note_id,))
+    conn.execute("DELETE FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id))
     conn.commit()
     return jsonify({"success": True})

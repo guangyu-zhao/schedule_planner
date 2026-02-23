@@ -93,7 +93,6 @@ export const GridMixin = {
             }
         }
         this.updateTimeIndicator();
-        this.scheduleReminders();
         if (this.selectedEventId) {
             const sel = document.querySelector(`.event[data-event-id="${this.selectedEventId}"]`);
             if (sel) sel.classList.add('selected');

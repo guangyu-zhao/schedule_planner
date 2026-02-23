@@ -4,6 +4,7 @@ import uuid
 import atexit
 import signal
 import logging
+import threading
 from datetime import timedelta
 
 from flask import Flask, jsonify, request, g
@@ -62,6 +63,9 @@ def before_request():
             if not referer.startswith(request.host_url):
                 logger.warning("CSRF: referer mismatch %s vs %s", referer, request.host_url)
                 return jsonify({"error": "非法请求来源"}), 403
+        else:
+            logger.warning("CSRF: no origin/referer for %s %s", request.method, request.path)
+            return jsonify({"error": "非法请求来源"}), 403
 
 
 @app.teardown_appcontext
@@ -127,18 +131,24 @@ except ImportError:
 
 
 _maintenance = {"requests": 0, "last_backup": 0}
+_maintenance_lock = threading.Lock()
+
 
 @app.before_request
 def periodic_maintenance():
-    _maintenance["requests"] += 1
-    if _maintenance["requests"] % 500 == 0:
+    with _maintenance_lock:
+        _maintenance["requests"] += 1
+        do_optimize = _maintenance["requests"] % 500 == 0
+        now = time.monotonic()
+        do_backup = now - _maintenance["last_backup"] > 86400
+        if do_backup:
+            _maintenance["last_backup"] = now
+    if do_optimize:
         try:
             optimize_db()
         except Exception:
             pass
-    now = time.monotonic()
-    if now - _maintenance["last_backup"] > 86400:
-        _maintenance["last_backup"] = now
+    if do_backup:
         try:
             backup_db()
         except Exception:

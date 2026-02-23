@@ -98,8 +98,9 @@ export const SearchMixin = {
                         <span class="search-result-meta">${escHtml(item.date)}</span>
                     </div>`;
                 }
+                const safeColor = /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : '#888888';
                 return `<div class="search-result-item" data-type="event" data-event-id="${item.id}" data-date="${escHtml(item.date)}">
-                    <span class="search-result-dot" style="background:${escHtml(item.color)}"></span>
+                    <span class="search-result-dot" style="background:${safeColor}"></span>
                     <span class="search-result-title">${escHtml(item.title)}</span>
                     <span class="search-result-meta">${escHtml(item.date)} ${escHtml(item.start_time)}-${escHtml(item.end_time)}</span>
                 </div>`;

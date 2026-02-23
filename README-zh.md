@@ -178,9 +178,9 @@ schedule_planner/
 │                           #   周期性优化、带时间戳的自动备份与轮转。
 │
 ├── auth_utils.py           # 认证工具 — @login_required 装饰器、
-│                           #   get_current_user()、验证码生成、
-│                           #   SMTP 邮件发送、验证码存储/校验、
-│                           #   重置会话过期检查。
+│                           #   get_current_user()、密码强度校验、
+│                           #   验证码生成、SMTP 邮件发送、
+│                           #   验证码存储/校验、重置会话过期检查。
 │
 ├── storage/                # 可插拔文件存储抽象层
 │   ├── __init__.py         # 工厂函数 get_storage() — 根据环境变量
@@ -282,13 +282,25 @@ schedule_planner/
 │       │                   #   分类/优先级标签（含 i18n）。
 │       ├── helpers.js      # 工具函数：ISO 日期格式化、
 │       │                   #   HTML 转义、消息提示展示。
-│       ├── planner.js      # PlannerApp 类 — 日历渲染、时间网格
-│       │                   #   渲染、事件增删改查（乐观 UI 更新）、
-│       │                   #   拖拽创建、边缘缩放与级联压缩、
-│       │                   #   列间拖拽移动、撤销历史栈、
-│       │                   #   Markdown 笔记编辑器（实时预览）、
-│       │                   #   图片插入（拖拽/粘贴/按钮）、
-│       │                   #   事件提醒（桌面通知）。
+│       ├── planner.js           # PlannerApp 核心 — 构造函数、init()、
+│       │                        #   bindEvents()、时间槽/日期辅助方法。
+│       │                        #   所有功能 Mixin 通过 Object.assign
+│       │                        #   合并到原型链上。
+│       ├── planner-calendar.js  # CalendarMixin — 日历渲染、日期切换、
+│       │                        #   日历标记（有日程/有笔记）。
+│       ├── planner-grid.js      # GridMixin — 时间网格与事件块渲染、
+│       │                        #   当前时间指示器、桌面通知调度。
+│       ├── planner-events-api.js# EventsApiMixin — 事件增删改查、
+│       │                        #   列间移动、批量更新、撤销历史栈。
+│       ├── planner-drag.js      # DragMixin — 拖拽创建、边缘缩放与
+│       │                        #   级联压缩、列间拖拽移动。
+│       ├── planner-modal.js     # ModalMixin — 事件编辑弹窗、颜色选
+│       │                        #   择器、右键气泡、提示、计划选取模式。
+│       ├── planner-notes.js     # NotesMixin — 多笔记管理、Markdown
+│       │                        #   编辑器（实时预览）、图片插入、
+│       │                        #   自动保存、笔记列表视图。
+│       └── planner-search.js    # SearchMixin — 关键字搜索日程与笔记、
+│                                #   搜索结果跳转到对应日期。
 │       ├── timer.js        # TimerManager 类 — 倒计时逻辑
 │       │                   #   （暂停/继续/停止/追加时间）、
 │       │                   #   番茄钟循环（自动短/长休息）、

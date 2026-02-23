@@ -22,6 +22,7 @@ export const EventsApiMixin = {
             }
             this.events = await r.json();
             this.renderEvents();
+            this.scheduleReminders();
         } catch (e) {
             console.error(e);
             showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.networkError') : 'Network error', { type: 'error' });
@@ -104,16 +105,17 @@ export const EventsApiMixin = {
     },
 
     async moveEventToColumn(evt, targetColType, startTime, endTime) {
-        if (!this._undoing) this.undoHistory.push({ type: 'delete', eventData: { ...evt } });
-
-        await this.deleteEvent(evt.id);
+        const prevData = { ...evt };
         const data = {
             title: evt.title, description: evt.description, date: evt.date,
             start_time: startTime, end_time: endTime, color: evt.color,
             category: evt.category, priority: evt.priority, completed: evt.completed,
-            col_type: targetColType,
+            col_type: targetColType, recur_rule: evt.recur_rule || null,
         };
-        await this.createEvent(data);
+        const result = await this.updateEvent(evt.id, data);
+        if (!this._undoing && result) {
+            this.undoHistory.push({ type: 'move', prevData, newId: evt.id });
+        }
         const key = targetColType === 'actual' ? 'toast.movedToActual' : 'toast.movedToPlan';
         showToast((window.I18n && window.I18n.t) ? window.I18n.t(key) : (targetColType === 'actual' ? 'Moved to Actual column' : 'Moved to Plan column'));
     },
@@ -171,6 +173,15 @@ export const EventsApiMixin = {
             } else if (action.type === 'resize') {
                 await this.batchUpdateEvents(action.items);
                 showToast(t('toast.undoResize'));
+            } else if (action.type === 'move') {
+                const ev = action.prevData;
+                await this.updateEvent(action.newId, {
+                    title: ev.title, description: ev.description, date: ev.date,
+                    start_time: ev.start_time, end_time: ev.end_time, color: ev.color,
+                    category: ev.category, priority: ev.priority, completed: ev.completed,
+                    col_type: ev.col_type || 'plan', recur_rule: ev.recur_rule || null,
+                });
+                showToast(t('toast.undoMove'));
             }
         } finally {
             this._undoing = false;

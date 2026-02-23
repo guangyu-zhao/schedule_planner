@@ -181,10 +181,10 @@ schedule_planner/
 │                           #   backup with rotation.
 │
 ├── auth_utils.py           # Authentication utilities — @login_required
-│                           #   decorator, get_current_user(), verification
-│                           #   code generation, SMTP email sending, code
-│                           #   storage/verification, and reset session
-│                           #   expiry check.
+│                           #   decorator, get_current_user(), password
+│                           #   validation, verification code generation,
+│                           #   SMTP email sending, code storage/verification,
+│                           #   and reset session expiry check.
 │
 ├── storage/                # Pluggable file-storage abstraction
 │   ├── __init__.py         # Factory function get_storage() — returns the
@@ -290,14 +290,27 @@ schedule_planner/
 │       │                   #   category/priority label helpers with i18n.
 │       ├── helpers.js      # Utility functions: ISO date formatting,
 │       │                   #   HTML escaping, toast notification display.
-│       ├── planner.js      # PlannerApp class — calendar rendering, time
-│       │                   #   grid rendering, event CRUD with optimistic
-│       │                   #   UI, drag-to-create, edge-resize with cascade
-│       │                   #   compression, drag-move between columns,
-│       │                   #   undo history stack, Markdown notes editor
-│       │                   #   with live preview (Marked + KaTeX), image
-│       │                   #   upload (drag/paste/button), event reminders
-│       │                   #   via desktop notifications.
+│       ├── planner.js           # PlannerApp core — class constructor,
+│       │                        #   init(), bindEvents(), slot/date helpers.
+│       │                        #   All feature mixins are merged onto the
+│       │                        #   prototype via Object.assign.
+│       ├── planner-calendar.js  # CalendarMixin — calendar rendering,
+│       │                        #   date-change handler, calendar dot
+│       │                        #   markers (has-event / has-note).
+│       ├── planner-grid.js      # GridMixin — time grid and event block
+│       │                        #   rendering, current-time indicator,
+│       │                        #   notification scheduling.
+│       ├── planner-events-api.js# EventsApiMixin — event CRUD, column
+│       │                        #   move, batch update, undo history stack.
+│       ├── planner-drag.js      # DragMixin — drag-to-create, edge-resize
+│       │                        #   with cascade compression, column move.
+│       ├── planner-modal.js     # ModalMixin — event editor modal, color
+│       │                        #   picker, popover, tooltip, plan-pick.
+│       ├── planner-notes.js     # NotesMixin — multi-note management,
+│       │                        #   Markdown editor with live preview,
+│       │                        #   image upload, auto-save, note list.
+│       └── planner-search.js    # SearchMixin — keyword search across
+│                                #   events and notes, jump-to-date.
 │       ├── timer.js        # TimerManager class — countdown logic with
 │       │                   #   pause/resume/stop/add-time, pomodoro cycle
 │       │                   #   (auto short/long breaks), ambient sound

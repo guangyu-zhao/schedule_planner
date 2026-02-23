@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from config import ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE
 from database import get_db
-from auth_utils import login_required
+from auth_utils import login_required, validate_password, validate_date
 from storage import get_storage
 
 logger = logging.getLogger(__name__)
@@ -25,17 +25,6 @@ _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 def _allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_AVATAR_EXTENSIONS
 
-
-def _validate_password(password):
-    if not password or len(password) < 8:
-        return False, "密码长度至少为 8 位"
-    if len(password) > 128:
-        return False, "密码长度不能超过 128 位"
-    if not re.search(r"[a-zA-Z]", password):
-        return False, "密码必须包含字母"
-    if not re.search(r"\d", password):
-        return False, "密码必须包含数字"
-    return True, ""
 
 
 @user_bp.route("/api/user/profile", methods=["GET"])
@@ -132,19 +121,26 @@ def upload_avatar():
     old = conn.execute(
         "SELECT avatar FROM users WHERE id=?", (g.user_id,)
     ).fetchone()
+
+    try:
+        conn.execute(
+            "UPDATE users SET avatar=?, updated_at=datetime('now','localtime') WHERE id=?",
+            (filename, g.user_id),
+        )
+        conn.commit()
+    except Exception:
+        storage.delete(relative_path)
+        logger.error("保存头像记录失败，已清理存储文件: %s", relative_path)
+        return jsonify({"error": "头像保存失败，请重试"}), 500
+
     if old and old["avatar"]:
         storage.delete(f"avatars/{old['avatar']}")
-
-    conn.execute(
-        "UPDATE users SET avatar=?, updated_at=datetime('now','localtime') WHERE id=?",
-        (filename, g.user_id),
-    )
-    conn.commit()
 
     return jsonify({"avatar": filename, "url": storage.url(relative_path)})
 
 
 @user_bp.route("/uploads/avatars/<filename>")
+@login_required
 def serve_avatar(filename):
     filename = secure_filename(filename)
     storage = get_storage()
@@ -210,7 +206,7 @@ def change_password():
     if new_password != confirm_password:
         return jsonify({"error": "两次输入的新密码不一致"}), 400
 
-    valid, msg = _validate_password(new_password)
+    valid, msg = validate_password(new_password)
     if not valid:
         return jsonify({"error": msg}), 400
 
@@ -371,7 +367,7 @@ def export_ical():
         lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")
 
-    content = "\r\n".join(lines)
+    content = "\r\n".join(_ical_fold_line(l) for l in lines) + "\r\n"
     return Response(
         content,
         mimetype="text/calendar",
@@ -387,6 +383,25 @@ def _ical_escape(text):
     return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
+def _ical_fold_line(line):
+    """Fold an iCal content line per RFC 5545 (max 75 octets per line, excluding CRLF)."""
+    encoded = line.encode("utf-8")
+    if len(encoded) <= 75:
+        return line
+    segments = []
+    remaining = encoded
+    limit = 75
+    while remaining:
+        chunk = remaining[:limit]
+        # Back up to avoid splitting a multi-byte UTF-8 sequence
+        while len(chunk) > 1 and (chunk[-1] & 0xC0) == 0x80:
+            chunk = chunk[:-1]
+        segments.append(chunk.decode("utf-8"))
+        remaining = remaining[len(chunk):]
+        limit = 74  # continuation lines: 74 bytes content + 1 byte leading space = 75
+    return "\r\n ".join(segments)
+
+
 @user_bp.route("/api/user/import", methods=["POST"])
 @login_required
 def import_data():
@@ -398,15 +413,22 @@ def import_data():
     imported_timer = data.get("timer_records", [])
     imported_notes = data.get("notes", [])
 
+    _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+    _DEFAULT_COLOR = "#6c5ce7"
+    _MAX_NOTE_LEN = 100_000
+
     conn = get_db()
     event_count = 0
     for e in imported_events:
-        if not e.get("title") or not e.get("date") or not e.get("start_time") or not e.get("end_time"):
+        title = (e.get("title") or "").strip()
+        if not title or not e.get("date") or not e.get("start_time") or not e.get("end_time"):
             continue
-        if not _DATE_RE.match(str(e["date"])):
+        if not validate_date(str(e["date"])):
             continue
         if not _TIME_RE.match(str(e["start_time"])) or not _TIME_RE.match(str(e["end_time"])):
             continue
+        title = title[:200]
+        description = (e.get("description") or "")[:5000]
         col_type = e.get("col_type", "plan")
         if col_type not in ("plan", "actual"):
             col_type = "plan"
@@ -417,12 +439,14 @@ def import_data():
                 priority = 2
         except (ValueError, TypeError):
             priority = 2
+        raw_color = e.get("color") or ""
+        color = raw_color if _COLOR_RE.match(raw_color) else _DEFAULT_COLOR
         conn.execute(
             """INSERT INTO events (user_id, title, description, date, start_time, end_time,
                color, category, priority, completed, col_type)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (g.user_id, e["title"], e.get("description", ""), e["date"],
-             e["start_time"], e["end_time"], e.get("color", "#6c5ce7"),
+            (g.user_id, title, description, e["date"],
+             e["start_time"], e["end_time"], color,
              e.get("category", "其他"), priority,
              1 if e.get("completed") else 0, col_type),
         )
@@ -430,19 +454,21 @@ def import_data():
 
     timer_count = 0
     for r in imported_timer:
-        if not r.get("task_name") or not r.get("date"):
+        task_name = (r.get("task_name") or "").strip()
+        if not task_name or not r.get("date"):
             continue
-        if not _DATE_RE.match(str(r["date"])):
+        if not validate_date(str(r["date"])):
             continue
+        task_name = task_name[:200]
         try:
-            planned = max(0, int(r.get("planned_minutes", 0)))
-            actual = max(0, int(r.get("actual_seconds", 0)))
+            planned = max(0, min(int(r.get("planned_minutes", 0)), 1440))
+            actual = max(0, min(int(r.get("actual_seconds", 0)), 86400))
         except (ValueError, TypeError):
             continue
         conn.execute(
             """INSERT INTO timer_records (user_id, task_name, planned_minutes, actual_seconds, date, completed)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (g.user_id, r["task_name"], planned, actual,
+            (g.user_id, task_name, planned, actual,
              r["date"], 1 if r.get("completed") else 0),
         )
         timer_count += 1
@@ -451,11 +477,12 @@ def import_data():
     for n in imported_notes:
         if not n.get("date"):
             continue
-        if not _DATE_RE.match(str(n["date"])):
+        if not validate_date(str(n["date"])):
             continue
         content = n.get("content", "")
         if not content.strip():
             continue
+        content = content[:_MAX_NOTE_LEN]
         conn.execute(
             "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
             (g.user_id, n["date"], content),

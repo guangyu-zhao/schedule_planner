@@ -287,18 +287,9 @@ export const ModalMixin = {
             this._planPickMode = true;
             this._planPickResolve = resolve;
 
-            const _planPickHints = {
-                'en':    'Click a plan event to copy its details, or press Esc to skip',
-                'zh-CN': '点击一个计划事项来复制其信息，或按 Esc 跳过',
-                'zh-TW': '點擊一個計劃事項來複製其資訊，或按 Esc 跳過',
-                'fr':    'Cliquez sur un événement planifié pour copier ses détails, ou appuyez sur Échap pour ignorer',
-                'de':    'Klicken Sie auf ein geplantes Ereignis zum Kopieren, oder drücken Sie Esc zum Überspringen',
-                'ja':    '計画イベントをクリックして詳細をコピー、またはEscでスキップ',
-                'ar':    'انقر على حدث مخطط لنسخ تفاصيله، أو اضغط Esc للتخطي',
-                'he':    'לחץ על אירוע מתוכנן להעתקת פרטיו, או לחץ Esc לדילוג',
-            };
-            const _lang = (() => { try { return localStorage.getItem('schedule_planner_lang') || 'en'; } catch(e) { return 'en'; } })();
-            const _hintText = _planPickHints[_lang] || _planPickHints['en'];
+            const _hintText = (window.I18n && window.I18n.t)
+                ? window.I18n.t('schedule.planPick.hint')
+                : 'Click a plan event to copy its details, or press Esc to skip';
 
             const overlay = document.createElement('div');
             overlay.id = 'planPickOverlay';

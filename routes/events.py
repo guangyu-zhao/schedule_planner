@@ -3,18 +3,25 @@ import re
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
 from database import get_db
-from auth_utils import login_required
+from auth_utils import login_required, validate_date, run_regex_with_timeout
 
 events_bp = Blueprint("events", __name__)
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_DEFAULT_COLOR = "#6c5ce7"
+
+
+def _normalize_color(color):
+    """Return color if it's a valid #rrggbb hex, else the default."""
+    return color if (color and COLOR_RE.match(color)) else _DEFAULT_COLOR
 
 
 def _validate_event_data(data, require_all=True):
     if not data:
         return "请求数据不能为空"
-    title = data.get("title", "").strip() if require_all else data.get("title", "ok")
+    title = (data.get("title") or "").strip()
     if require_all and not title:
         return "标题不能为空"
     if title and len(title) > 200:
@@ -23,7 +30,7 @@ def _validate_event_data(data, require_all=True):
     if desc and len(desc) > 5000:
         return "备注不能超过 5000 个字符"
     date = data.get("date", "")
-    if require_all and not DATE_RE.match(date):
+    if require_all and not validate_date(date):
         return "日期格式不正确"
     start_time = data.get("start_time", "")
     end_time = data.get("end_time", "")
@@ -39,7 +46,7 @@ def _validate_event_data(data, require_all=True):
 def get_events():
     start = request.args.get("start", "")
     end = request.args.get("end", "")
-    if not DATE_RE.match(start) or not DATE_RE.match(end):
+    if not validate_date(start) or not validate_date(end):
         return jsonify({"error": "日期参数格式不正确"}), 400
     conn = get_db()
     events = conn.execute(
@@ -79,7 +86,7 @@ def create_event():
             data["date"],
             data["start_time"],
             data["end_time"],
-            data.get("color", "#6c5ce7"),
+            _normalize_color(data.get("color")),
             data.get("category", "工作"),
             int(data.get("priority", 1)),
             col_type,
@@ -107,7 +114,7 @@ def update_event(event_id):
 
     conn = get_db()
     existing = conn.execute(
-        "SELECT id FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
+        "SELECT id, col_type FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
     ).fetchone()
     if not existing:
         return jsonify({"error": "事件不存在"}), 404
@@ -116,9 +123,13 @@ def update_event(event_id):
     if recur_rule and recur_rule not in ("daily", "weekdays", "weekly", "monthly"):
         recur_rule = None
 
+    col_type = data.get("col_type")
+    if col_type not in ("plan", "actual"):
+        col_type = existing["col_type"]
+
     conn.execute(
         """UPDATE events SET title=?, description=?, date=?, start_time=?, end_time=?,
-           color=?, category=?, priority=?, completed=?, recur_rule=?,
+           color=?, category=?, priority=?, completed=?, recur_rule=?, col_type=?,
            updated_at=datetime('now','localtime')
            WHERE id=? AND user_id=?""",
         (
@@ -127,11 +138,12 @@ def update_event(event_id):
             data["date"],
             data["start_time"],
             data["end_time"],
-            data.get("color", "#6c5ce7"),
+            _normalize_color(data.get("color")),
             data.get("category", "工作"),
             int(data.get("priority", 1)),
             int(data.get("completed", 0)),
             recur_rule,
+            col_type,
             event_id,
             g.user_id,
         ),
@@ -149,6 +161,7 @@ def batch_update_events():
         return jsonify({"error": "请求数据格式不正确"}), 400
     conn = get_db()
     results = []
+    valid_ids = set()
     for item in items:
         if not isinstance(item, dict) or "id" not in item:
             continue
@@ -166,12 +179,16 @@ def batch_update_events():
             "UPDATE events SET start_time=?, end_time=?, updated_at=datetime('now','localtime') WHERE id=? AND user_id=?",
             (start_time, end_time, item["id"], g.user_id),
         )
+        valid_ids.add(item["id"])
     conn.commit()
     for item in items:
-        if not isinstance(item, dict) or "id" not in item:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id")
+        if item_id not in valid_ids:
             continue
         row = conn.execute(
-            "SELECT * FROM events WHERE id=? AND user_id=?", (item["id"], g.user_id)
+            "SELECT * FROM events WHERE id=? AND user_id=?", (item_id, g.user_id)
         ).fetchone()
         if row:
             results.append(dict(row))
@@ -239,7 +256,7 @@ def generate_recurring():
     data = request.json or {}
     start = data.get("start", "")
     end = data.get("end", "")
-    if not DATE_RE.match(start) or not DATE_RE.match(end):
+    if not validate_date(start) or not validate_date(end):
         return jsonify({"error": "日期参数格式不正确"}), 400
 
     conn = get_db()
@@ -372,7 +389,7 @@ def events_dates():
     """Return distinct dates that have at least one event, within a date range."""
     start = request.args.get("start", "")
     end   = request.args.get("end",   "")
-    if not DATE_RE.match(start) or not DATE_RE.match(end):
+    if not validate_date(start) or not validate_date(end):
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
@@ -405,12 +422,16 @@ def search_events():
         except re.error as exc:
             return jsonify({"error": str(exc)}), 400
         rows = conn.execute(
-            "SELECT * FROM events WHERE user_id=? ORDER BY date DESC, start_time",
-            (g.user_id,),
+            "SELECT * FROM events WHERE user_id=? ORDER BY date DESC, start_time LIMIT ?",
+            (g.user_id, limit * 20),
         ).fetchall()
-        def _match(r):
-            return pattern.search(r["title"] or "") or pattern.search(r["description"] or "")
-        return jsonify([dict(r) for r in rows if _match(r)][:limit])
+        matched, err = run_regex_with_timeout(
+            pattern, rows,
+            [lambda r: r["title"] or "", lambda r: r["description"] or ""],
+        )
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify([dict(r) for r in matched[:limit]])
 
     # Non-regex: use LIKE for initial broad filter, then Python-refine
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

@@ -1,7 +1,9 @@
+import re
 import secrets
 import smtplib
 import string
 import logging
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
@@ -22,6 +24,59 @@ from config import (
 from database import get_db
 
 logger = logging.getLogger(__name__)
+
+
+_DATE_FORMAT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def validate_date(date_str):
+    """Return True only if date_str is both format-correct and a real calendar date."""
+    if not _DATE_FORMAT_RE.match(date_str or ""):
+        return False
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def run_regex_with_timeout(pattern, items, get_text_fns, timeout=3.0):
+    """Apply a compiled regex to *items* with a timeout to prevent ReDoS.
+
+    get_text_fns: list of callables that extract a text field from one item.
+    Returns (matched_items, error_message).  On timeout, matched_items is None.
+    """
+    results = []
+    stop_event = threading.Event()
+
+    def _filter():
+        for item in items:
+            if stop_event.is_set():
+                break
+            for get_text in get_text_fns:
+                if pattern.search(get_text(item) or ""):
+                    results.append(item)
+                    break
+
+    t = threading.Thread(target=_filter, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        stop_event.set()
+        return None, "正则表达式执行超时，请简化搜索模式"
+    return results, None
+
+
+def validate_password(password):
+    if not password or len(password) < 8:
+        return False, "密码长度至少为 8 位"
+    if len(password) > 128:
+        return False, "密码长度不能超过 128 位"
+    if not re.search(r"[a-zA-Z]", password):
+        return False, "密码必须包含字母"
+    if not re.search(r"\d", password):
+        return False, "密码必须包含数字"
+    return True, ""
 
 
 def login_required(f):
@@ -143,7 +198,7 @@ def check_reset_session_valid():
 
 
 def _cleanup_expired_codes(conn):
-    """Remove verification codes that expired more than 24 hours ago."""
+    """Remove verification codes that expired more than 24 hours ago, or that have been used."""
     cutoff = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         "DELETE FROM verification_codes WHERE expires_at < ? OR used = 1",

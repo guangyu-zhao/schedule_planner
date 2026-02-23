@@ -1,6 +1,7 @@
 import re
 import time
 import logging
+import threading
 from collections import defaultdict
 from datetime import datetime
 
@@ -16,6 +17,7 @@ from auth_utils import (
     store_verification_code,
     verify_code,
     check_reset_session_valid,
+    validate_password,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 MAX_LOGIN_ATTEMPTS = 10
 LOGIN_LOCKOUT_SECONDS = 900
 _login_attempts = defaultdict(list)
+_login_attempts_lock = threading.Lock()
 _ATTEMPTS_CLEANUP_INTERVAL = 300
 _last_attempts_cleanup = 0
 
@@ -35,33 +38,20 @@ def _validate_email(email):
     return bool(EMAIL_RE.match(email or ""))
 
 
-def _validate_password(password):
-    if not password or len(password) < 8:
-        return False, "密码长度至少为 8 位"
-    if len(password) > 128:
-        return False, "密码长度不能超过 128 位"
-    if not re.search(r"[a-zA-Z]", password):
-        return False, "密码必须包含字母"
-    if not re.search(r"\d", password):
-        return False, "密码必须包含数字"
-    return True, ""
-
-
 def _cleanup_login_attempts():
     global _last_attempts_cleanup
     now = time.monotonic()
     if now - _last_attempts_cleanup < _ATTEMPTS_CLEANUP_INTERVAL:
         return
     _last_attempts_cleanup = now
-    stale_keys = []
-    for key, attempts in _login_attempts.items():
-        fresh = [t for t in attempts if now - t < LOGIN_LOCKOUT_SECONDS]
-        if not fresh:
-            stale_keys.append(key)
-        else:
-            _login_attempts[key] = fresh
-    for key in stale_keys:
-        del _login_attempts[key]
+    with _login_attempts_lock:
+        stale_keys = [k for k, v in _login_attempts.items()
+                      if not any(now - t < LOGIN_LOCKOUT_SECONDS for t in v)]
+        for key in stale_keys:
+            del _login_attempts[key]
+        for key in list(_login_attempts):
+            if key not in stale_keys:
+                _login_attempts[key] = [t for t in _login_attempts[key] if now - t < LOGIN_LOCKOUT_SECONDS]
 
 
 @auth_bp.route("/api/auth/register", methods=["POST"])
@@ -75,7 +65,7 @@ def register():
         return jsonify({"error": "邮箱格式不正确"}), 400
     if not username or len(username) < 2 or len(username) > 30:
         return jsonify({"error": "用户名长度需在 2-30 个字符之间"}), 400
-    valid, msg = _validate_password(password)
+    valid, msg = validate_password(password)
     if not valid:
         return jsonify({"error": msg}), 400
 
@@ -108,19 +98,22 @@ def register():
 
 def _check_login_lockout(key):
     now = time.monotonic()
-    _login_attempts[key] = [t for t in _login_attempts[key] if now - t < LOGIN_LOCKOUT_SECONDS]
-    if len(_login_attempts[key]) >= MAX_LOGIN_ATTEMPTS:
-        remaining = int(LOGIN_LOCKOUT_SECONDS - (now - _login_attempts[key][0]))
-        return True, remaining
+    with _login_attempts_lock:
+        _login_attempts[key] = [t for t in _login_attempts[key] if now - t < LOGIN_LOCKOUT_SECONDS]
+        if len(_login_attempts[key]) >= MAX_LOGIN_ATTEMPTS:
+            remaining = int(LOGIN_LOCKOUT_SECONDS - (now - _login_attempts[key][0]))
+            return True, remaining
     return False, 0
 
 
 def _record_login_failure(key):
-    _login_attempts[key].append(time.monotonic())
+    with _login_attempts_lock:
+        _login_attempts[key].append(time.monotonic())
 
 
 def _clear_login_failures(key):
-    _login_attempts.pop(key, None)
+    with _login_attempts_lock:
+        _login_attempts.pop(key, None)
 
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
@@ -232,7 +225,7 @@ def reset_password():
     email = session.get("reset_email")
 
     password = data.get("password") or ""
-    valid, msg = _validate_password(password)
+    valid, msg = validate_password(password)
     if not valid:
         return jsonify({"error": msg}), 400
 

@@ -52,3 +52,6 @@ RESET_SESSION_EXPIRY = 600
 
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 AVATAR_MAX_SIZE = (256, 256)
+
+ALLOWED_NOTE_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+NOTE_IMAGE_MAX_SIZE = (2048, 2048)

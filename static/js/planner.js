@@ -1215,7 +1215,28 @@ export class PlannerApp {
                 breaks: true,
                 gfm: true,
                 extensions,
+                renderer: {
+                    image({ href, title, text }) {
+                        const src = href && href.startsWith('ni:')
+                            ? '/api/notes/images/' + href.slice(3)
+                            : (href || '');
+                        const alt = text || '';
+                        const titleAttr = title ? ` title="${title}"` : '';
+                        return `<img src="${src}" alt="${alt}"${titleAttr} style="max-width:100%">`;
+                    }
+                },
             });
+
+            if (typeof DOMPurify !== 'undefined') {
+                DOMPurify.addHook('beforeSanitizeAttributes', node => {
+                    if (node.tagName === 'IMG') {
+                        const src = node.getAttribute('src');
+                        if (src && src.startsWith('ni:')) {
+                            node.setAttribute('src', '/api/notes/images/' + src.slice(3));
+                        }
+                    }
+                });
+            }
         }
 
         const editor = document.getElementById('notesEditor');
@@ -1223,6 +1244,54 @@ export class PlannerApp {
             this.noteContent = editor.value;
             this.renderNotePreview();
             this.debounceSaveNote();
+        });
+
+        editor.addEventListener('paste', e => {
+            const items = e.clipboardData && e.clipboardData.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const file = item.getAsFile();
+                    if (file) this.uploadNoteImage(file);
+                    break;
+                }
+            }
+        });
+
+        editor.addEventListener('dragover', e => {
+            const hasFile = e.dataTransfer && Array.from(e.dataTransfer.items || []).some(
+                i => i.kind === 'file' && i.type.startsWith('image/')
+            );
+            if (hasFile) {
+                e.preventDefault();
+                editor.classList.add('drag-over');
+            }
+        });
+
+        editor.addEventListener('dragleave', () => {
+            editor.classList.remove('drag-over');
+        });
+
+        editor.addEventListener('drop', e => {
+            editor.classList.remove('drag-over');
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files) return;
+            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length) {
+                e.preventDefault();
+                imageFiles.forEach(f => this.uploadNoteImage(f));
+            }
+        });
+
+        document.getElementById('notesImgBtn').addEventListener('click', () => {
+            document.getElementById('notesImgInput').click();
+        });
+
+        document.getElementById('notesImgInput').addEventListener('change', e => {
+            const file = e.target.files && e.target.files[0];
+            if (file) this.uploadNoteImage(file);
+            e.target.value = '';
         });
 
         editor.addEventListener('keydown', e => {
@@ -1325,6 +1394,43 @@ export class PlannerApp {
         }
     }
 
+    async uploadNoteImage(file) {
+        const t = k => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
+        const editor = document.getElementById('notesEditor');
+        const placeholder = `![${t('schedule.imageUploading')}]()`;
+        const start = editor.selectionStart;
+        const before = editor.value.substring(0, start);
+        const after = editor.value.substring(editor.selectionEnd);
+        editor.value = before + placeholder + after;
+        editor.selectionStart = editor.selectionEnd = start + placeholder.length;
+        this.noteContent = editor.value;
+
+        const formData = new FormData();
+        formData.append('image', file);
+        try {
+            const r = await fetch('/api/notes/images', { method: 'POST', body: formData });
+            const data = await r.json();
+            if (!r.ok) {
+                editor.value = before + after;
+                editor.selectionStart = editor.selectionEnd = start;
+                this.noteContent = editor.value;
+                showToast(data.error || t('toast.noteImageUploadFailed'), { type: 'error' });
+            } else {
+                const md = `<img src="ni:${data.token}" style="display:block; margin:0 auto; zoom:100%;"/>`;
+                editor.value = before + md + after;
+                editor.selectionStart = editor.selectionEnd = start + md.length;
+                this.noteContent = editor.value;
+                this.renderNotePreview();
+                this.debounceSaveNote();
+            }
+        } catch (e) {
+            editor.value = before + after;
+            editor.selectionStart = editor.selectionEnd = start;
+            this.noteContent = editor.value;
+            showToast(t('toast.noteImageUploadFailed'), { type: 'error' });
+        }
+    }
+
     debounceSaveNote() {
         if (this.noteSaveTimer) clearTimeout(this.noteSaveTimer);
         const dateToSave = this.selectedDateStr();
@@ -1397,7 +1503,10 @@ export class PlannerApp {
             let html = marked.parse(content);
             html = html.replace(/<br\s*\/?>/g, '<span class="hard-break"></span>');
             if (typeof DOMPurify !== 'undefined') {
-                html = DOMPurify.sanitize(html, { ADD_TAGS: ['span'], ADD_ATTR: ['class'] });
+                html = DOMPurify.sanitize(html, {
+                    ADD_TAGS: ['span'],
+                    ADD_ATTR: ['class', 'style', 'align', 'width', 'height', 'colspan', 'rowspan'],
+                });
             }
             preview.innerHTML = html;
         } else {

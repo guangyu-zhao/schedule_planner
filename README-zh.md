@@ -28,6 +28,7 @@
 - 支持**编辑**与**预览**切换。
 - 支持标题、加粗、斜体、列表、引用、表格、围栏代码块、行内代码。
 - LaTeX 数学公式 — 行内 `$...$` 与块级 `$$...$$`。
+- **图片插入** — 从浏览器外将图片拖入编辑器、从剪贴板粘贴（Ctrl+V）或点击图片按钮即可插入图片。图片通过 OSS 存储抽象层保存，嵌入 Markdown 的代号为不透明字符串，不暴露任何内部 ID 信息。也支持用 HTML `<img>` 标签排版图片。
 - Tab / Shift+Tab 缩进/反缩进选中行。
 - 自动保存（800ms 防抖），切换日期时安全刷写。
 
@@ -170,10 +171,10 @@ schedule_planner/
 │
 ├── database.py             # 数据库层 — SQLite 连接管理，完整的表结构
 │                           #   创建（users、events、timer_records、
-│                           #   notes、event_templates、user_settings、
-│                           #   verification_codes、deleted_events），
-│                           #   列迁移、索引创建、周期性优化、
-│                           #   带时间戳的自动备份与轮转。
+│                           #   notes、note_images、event_templates、
+│                           #   user_settings、verification_codes、
+│                           #   deleted_events），列迁移、索引创建、
+│                           #   周期性优化、带时间戳的自动备份与轮转。
 │
 ├── auth_utils.py           # 认证工具 — @login_required 装饰器、
 │                           #   get_current_user()、验证码生成、
@@ -212,7 +213,8 @@ schedule_planner/
 │   ├── timer.py            # 计时器 API：创建/查询/删除计时记录，
 │   │                       #   按日统计（总数、完成数、总秒数）。
 │   ├── notes.py            # 笔记 API：按日期获取/保存 Markdown 笔记，
-│   │                       #   按关键字搜索笔记。
+│   │                       #   按关键字搜索笔记，通过 OSS 抽象层
+│   │                       #   上传并访问笔记图片。
 │   ├── stats.py            # 统计 API：每日统计（事件数、时长、
 │   │                       #   完成率）、日期范围分析、活动热力图、
 │   │                       #   连续打卡天数计算。
@@ -284,6 +286,7 @@ schedule_planner/
 │       │                   #   拖拽创建、边缘缩放与级联压缩、
 │       │                   #   列间拖拽移动、撤销历史栈、
 │       │                   #   Markdown 笔记编辑器（实时预览）、
+│       │                   #   图片插入（拖拽/粘贴/按钮）、
 │       │                   #   事件提醒（桌面通知）。
 │       ├── timer.js        # TimerManager 类 — 倒计时逻辑
 │       │                   #   （暂停/继续/停止/追加时间）、
@@ -297,7 +300,8 @@ schedule_planner/
 │                           #   折线图）。
 │
 └── uploads/
-    └── avatars/            # 用户上传的头像图片（本地存储）
+    ├── avatars/            # 用户上传的头像图片（本地存储）
+    └── note_images/        # 笔记嵌入图片，按用户分目录存储（本地存储）
 ```
 
 ## API 接口
@@ -362,6 +366,8 @@ schedule_planner/
 | GET | `/api/notes?date=` | 获取指定日期笔记 |
 | PUT | `/api/notes` | 保存笔记 |
 | GET | `/api/notes/search?q=` | 按关键字搜索笔记 |
+| POST | `/api/notes/images` | 上传笔记图片，返回不透明令牌 |
+| GET | `/api/notes/images/<token>` | 按令牌访问笔记图片 |
 
 ### 数据统计
 

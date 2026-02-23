@@ -28,6 +28,7 @@ On the right side of the schedule page, there is also a **Markdown notes** area 
 - Toggle between **Edit** and **Preview** tabs.
 - Supports headings, bold, italic, lists, blockquotes, tables, code blocks, and inline code.
 - LaTeX math formulas — inline `$...$` and block `$$...$$`.
+- **Image upload** — drag an image from outside the browser into the editor, paste from clipboard (Ctrl+V), or click the image button to insert. Images are stored via the OSS abstraction layer; the token embedded in the Markdown is an opaque identifier that does not expose any internal IDs. Images also render when written as HTML `<img>` tags.
 - Tab / Shift+Tab to indent / unindent selected lines.
 - Auto-save with 800 ms debounce; safe across date switches.
 
@@ -171,11 +172,12 @@ schedule_planner/
 │
 ├── database.py             # Database layer — SQLite connection management,
 │                           #   full schema creation (users, events,
-│                           #   timer_records, notes, event_templates,
-│                           #   user_settings, verification_codes,
-│                           #   deleted_events), column migrations, index
-│                           #   creation, periodic optimization, and
-│                           #   timestamped backup with rotation.
+│                           #   timer_records, notes, note_images,
+│                           #   event_templates, user_settings,
+│                           #   verification_codes, deleted_events),
+│                           #   column migrations, index creation,
+│                           #   periodic optimization, and timestamped
+│                           #   backup with rotation.
 │
 ├── auth_utils.py           # Authentication utilities — @login_required
 │                           #   decorator, get_current_user(), verification
@@ -217,7 +219,8 @@ schedule_planner/
 │   ├── timer.py            # Timer API: create/list/delete timer records,
 │   │                       #   per-day stats (total, completed, seconds).
 │   ├── notes.py            # Notes API: get/save per-date Markdown notes,
-│   │                       #   search notes by keyword.
+│   │                       #   search notes by keyword, upload/serve
+│   │                       #   note images via OSS abstraction.
 │   ├── stats.py            # Statistics API: daily stats (event count,
 │   │                       #   hours, completion rate), date-range analytics,
 │   │                       #   activity heatmap, streak calculation.
@@ -291,8 +294,9 @@ schedule_planner/
 │       │                   #   UI, drag-to-create, edge-resize with cascade
 │       │                   #   compression, drag-move between columns,
 │       │                   #   undo history stack, Markdown notes editor
-│       │                   #   with live preview (Marked + KaTeX), event
-│       │                   #   reminders via desktop notifications.
+│       │                   #   with live preview (Marked + KaTeX), image
+│       │                   #   upload (drag/paste/button), event reminders
+│       │                   #   via desktop notifications.
 │       ├── timer.js        # TimerManager class — countdown logic with
 │       │                   #   pause/resume/stop/add-time, pomodoro cycle
 │       │                   #   (auto short/long breaks), ambient sound
@@ -305,7 +309,8 @@ schedule_planner/
 │                           #   creation (bar, doughnut, line charts).
 │
 └── uploads/
-    └── avatars/            # User-uploaded avatar images (local storage)
+    ├── avatars/            # User-uploaded avatar images (local storage)
+    └── note_images/        # Note-embedded images, stored per user (local storage)
 ```
 
 ## API Endpoints
@@ -370,6 +375,8 @@ schedule_planner/
 | GET | `/api/notes?date=` | Get note for a date |
 | PUT | `/api/notes` | Save note |
 | GET | `/api/notes/search?q=` | Search notes by keyword |
+| POST | `/api/notes/images` | Upload note image; returns opaque token |
+| GET | `/api/notes/images/<token>` | Serve note image by token |
 
 ### Statistics
 

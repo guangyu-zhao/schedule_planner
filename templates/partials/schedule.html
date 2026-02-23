@@ -30,9 +30,13 @@
             <div class="notes-panel">
                 <div class="notes-header">
                     <span class="notes-title">📝 <span data-i18n="schedule.notes">Notes</span> <span class="note-save-indicator" id="noteSaveIndicator"></span></span>
-                    <div class="notes-tabs">
-                        <button class="notes-tab active" data-mode="edit" data-i18n="schedule.edit">Edit</button>
-                        <button class="notes-tab" data-mode="preview" data-i18n="schedule.preview">Preview</button>
+                    <div class="notes-header-right">
+                        <button class="notes-img-btn" id="notesImgBtn" data-i18n-title="schedule.insertImage" title="Insert image">🖼</button>
+                        <input type="file" id="notesImgInput" accept="image/*" style="display:none">
+                        <div class="notes-tabs">
+                            <button class="notes-tab active" data-mode="edit" data-i18n="schedule.edit">Edit</button>
+                            <button class="notes-tab" data-mode="preview" data-i18n="schedule.preview">Preview</button>
+                        </div>
                     </div>
                 </div>
                 <div class="notes-body">

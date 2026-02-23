@@ -488,9 +488,14 @@ def delete_account():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "密码错误"}), 400
 
+    note_images = conn.execute(
+        "SELECT storage_path FROM note_images WHERE user_id=?", (g.user_id,)
+    ).fetchall()
+
     conn.execute("DELETE FROM events WHERE user_id=?", (g.user_id,))
     conn.execute("DELETE FROM timer_records WHERE user_id=?", (g.user_id,))
     conn.execute("DELETE FROM notes WHERE user_id=?", (g.user_id,))
+    conn.execute("DELETE FROM note_images WHERE user_id=?", (g.user_id,))
     conn.execute("DELETE FROM event_templates WHERE user_id=?", (g.user_id,))
     conn.execute("DELETE FROM user_settings WHERE user_id=?", (g.user_id,))
     conn.execute("DELETE FROM deleted_events WHERE user_id=?", (g.user_id,))
@@ -498,8 +503,11 @@ def delete_account():
     conn.execute("DELETE FROM users WHERE id=?", (g.user_id,))
     conn.commit()
 
+    storage = get_storage()
     if user["avatar"]:
-        get_storage().delete(f"avatars/{user['avatar']}")
+        storage.delete(f"avatars/{user['avatar']}")
+    for row in note_images:
+        storage.delete(row["storage_path"])
 
     session.clear()
     return jsonify({"success": True, "message": "账户已删除"})

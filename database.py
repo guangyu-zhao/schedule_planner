@@ -177,6 +177,18 @@ def init_db():
 
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS note_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            storage_path TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """
+    )
+
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS deleted_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -211,6 +223,7 @@ def _migrate(conn):
     _migrate_events(conn)
     _migrate_timer_records(conn)
     _migrate_notes(conn)
+    _migrate_note_images(conn)
     _create_indexes(conn)
 
 
@@ -284,6 +297,21 @@ def _migrate_notes(conn):
                 pass
 
 
+def _migrate_note_images(conn):
+    """Ensure note_images table exists (for older DBs that lack it)."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS note_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            storage_path TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """
+    )
+
+
 def _create_indexes(conn):
     indexes = [
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_user_date ON notes(user_id, date)",
@@ -296,6 +324,8 @@ def _create_indexes(conn):
         "CREATE INDEX IF NOT EXISTS idx_templates_user ON event_templates(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_events_col_type ON events(user_id, col_type, date)",
         "CREATE INDEX IF NOT EXISTS idx_deleted_events_user ON deleted_events(user_id, deleted_at)",
+        "CREATE INDEX IF NOT EXISTS idx_note_images_token ON note_images(token)",
+        "CREATE INDEX IF NOT EXISTS idx_note_images_user ON note_images(user_id)",
     ]
     for sql in indexes:
         try:

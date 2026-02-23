@@ -1,12 +1,96 @@
+import io
+import logging
 import re
+import uuid
+
 from flask import Blueprint, request, jsonify, g
+from werkzeug.utils import secure_filename
+
+from config import ALLOWED_NOTE_IMAGE_EXTENSIONS, NOTE_IMAGE_MAX_SIZE
 from database import get_db
 from auth_utils import login_required
+from storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 notes_bp = Blueprint("notes", __name__)
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_NOTE_LENGTH = 100_000
+
+
+def _allowed_image(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_NOTE_IMAGE_EXTENSIONS
+
+
+@notes_bp.route("/api/notes/images", methods=["POST"])
+@login_required
+def upload_note_image():
+    if "image" not in request.files:
+        return jsonify({"error": "请选择图片文件"}), 400
+
+    file = request.files["image"]
+    if not file.filename or not _allowed_image(file.filename):
+        return jsonify({"error": "不支持的文件格式，请上传 PNG/JPG/GIF/WebP"}), 400
+
+    storage = get_storage()
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    token = uuid.uuid4().hex
+    storage_path = f"note_images/{g.user_id}/{token}.{ext}"
+
+    try:
+        from PIL import Image
+
+        img = Image.open(file.stream)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGBA" if ext == "png" else "RGB")
+            if ext not in ("png", "gif"):
+                ext = "jpg"
+                storage_path = f"note_images/{g.user_id}/{token}.{ext}"
+
+        width, height = img.size
+        max_w, max_h = NOTE_IMAGE_MAX_SIZE
+        if width > max_w or height > max_h:
+            img.thumbnail(NOTE_IMAGE_MAX_SIZE, Image.LANCZOS)
+
+        buf = io.BytesIO()
+        fmt = "JPEG" if ext in ("jpg", "jpeg") else ext.upper()
+        save_kwargs = {"quality": 88} if fmt == "JPEG" else {}
+        img.save(buf, format=fmt, **save_kwargs)
+        storage.save(buf.getvalue(), storage_path)
+    except ImportError:
+        file.stream.seek(0)
+        storage.save(file.stream, storage_path)
+    except Exception as e:
+        logger.warning("笔记图片处理失败: %s", e)
+        return jsonify({"error": "图片处理失败，请上传有效的图片文件"}), 400
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO note_images (user_id, token, storage_path) VALUES (?, ?, ?)",
+        (g.user_id, token, storage_path),
+    )
+    conn.commit()
+
+    return jsonify({"token": token})
+
+
+@notes_bp.route("/api/notes/images/<token>")
+@login_required
+def serve_note_image(token):
+    if not re.match(r"^[0-9a-f]{32}$", token):
+        return jsonify({"error": "无效的图片令牌"}), 404
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT storage_path FROM note_images WHERE token=? AND user_id=?",
+        (token, g.user_id),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "图片不存在或无权访问"}), 404
+
+    storage = get_storage()
+    return storage.serve(row["storage_path"])
 
 
 @notes_bp.route("/api/notes/dates", methods=["GET"])

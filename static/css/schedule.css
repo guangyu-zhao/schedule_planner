@@ -278,6 +278,31 @@
 .notes-tab:hover { color: var(--text-secondary); }
 .notes-tab.active { background: var(--bg-primary); color: var(--accent); box-shadow: var(--shadow-sm); }
 
+.notes-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.notes-img-btn {
+    padding: 3px 7px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    line-height: 1;
+}
+.notes-img-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+.notes-editor.drag-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg-primary));
+}
+
 .notes-body {
     flex: 1;
     display: flex;

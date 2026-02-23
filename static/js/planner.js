@@ -52,6 +52,8 @@ export class PlannerApp {
         this._planPickMode = false;
         this._planPickResolve = null;
 
+        this._tooltip = null;
+
         this.init();
     }
 
@@ -67,6 +69,7 @@ export class PlannerApp {
         this.fetchNote();
         this.scrollToCurrentTime();
         this.startTimeIndicator();
+        this._initTooltip();
     }
 
     /* ---- Date helpers ---- */
@@ -207,6 +210,14 @@ export class PlannerApp {
                 `<div class="resize-handle resize-handle-top"></div>` +
                 `<div class="event-content">${escHtml(evt.start_time)}–${escHtml(evt.end_time)} · ${catPart} · ${escHtml(evt.title)}${recurIcon}</div>` +
                 `<div class="resize-handle resize-handle-bottom"></div>`;
+
+            el.addEventListener('mouseenter', e => {
+                if (!this.isResizing) this._showTooltip(evt, e.clientX, e.clientY);
+            });
+            el.addEventListener('mousemove', e => {
+                if (this._tooltip?.classList.contains('active')) this._positionTooltip(e.clientX, e.clientY);
+            });
+            el.addEventListener('mouseleave', () => this._hideTooltip());
 
             el.addEventListener('click', e => {
                 if (this.isResizing) return;
@@ -447,6 +458,60 @@ export class PlannerApp {
         } catch (e) { console.error(e); }
     }
 
+
+    /* ================================================================
+       EVENT TOOLTIP
+       ================================================================ */
+    _initTooltip() {
+        const tip = document.createElement('div');
+        tip.id = 'eventTooltip';
+        document.body.appendChild(tip);
+        this._tooltip = tip;
+        document.getElementById('scheduleGrid')?.addEventListener('scroll', () => this._hideTooltip(), { passive: true });
+    }
+
+    _showTooltip(evt, x, y) {
+        const tip = this._tooltip;
+        if (!tip) return;
+        tip.innerHTML = '';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'event-tooltip-title';
+        titleEl.textContent = evt.title;
+        tip.appendChild(titleEl);
+
+        const desc = evt.description ? evt.description.trim() : '';
+        if (desc) {
+            const sep = document.createElement('div');
+            sep.className = 'event-tooltip-sep';
+            tip.appendChild(sep);
+            const descEl = document.createElement('div');
+            descEl.className = 'event-tooltip-desc';
+            descEl.textContent = desc;
+            tip.appendChild(descEl);
+        }
+
+        tip.style.borderLeftColor = evt.color || 'var(--accent)';
+        tip.classList.add('active');
+        this._positionTooltip(x, y);
+    }
+
+    _positionTooltip(x, y) {
+        const tip = this._tooltip;
+        if (!tip) return;
+        const offset = 16;
+        let left = x + offset;
+        let top = y + offset;
+        const rect = tip.getBoundingClientRect();
+        if (left + rect.width > window.innerWidth - 8) left = x - rect.width - offset;
+        if (top + rect.height > window.innerHeight - 8) top = y - rect.height - offset;
+        tip.style.left = Math.max(4, left) + 'px';
+        tip.style.top = Math.max(4, top) + 'px';
+    }
+
+    _hideTooltip() {
+        this._tooltip?.classList.remove('active');
+    }
 
     /* ================================================================
        PLAN PICK MODE – choose a plan event to prefill actual creation
@@ -825,7 +890,7 @@ export class PlannerApp {
         this.openModal();
     }
 
-    openModal() { document.getElementById('modalOverlay').classList.add('active'); }
+    openModal() { this._hideTooltip(); document.getElementById('modalOverlay').classList.add('active'); }
     closeModal() { document.getElementById('modalOverlay').classList.remove('active'); this.editingEvent = null; this.editingColType = null; }
 
     async saveEvent() {

@@ -35,6 +35,8 @@ export class PlannerApp {
         this.dragMoveEl = null;
 
         this.noteContent = '';
+        this.notesList = [];
+        this.currentNoteId = null;
         this.noteSaveTimer = null;
         this.noteMode = 'edit';
 
@@ -42,6 +44,7 @@ export class PlannerApp {
         this.notifiedEventIds = new Set();
         this._searchTimer = null;
         this._pendingHighlightId = null;
+        this._pendingHighlightNoteId = null;
         this._markerCacheMonth = null;
         this._markerCacheEvents = new Set();
         this._markerCacheNotes = new Set();
@@ -66,7 +69,7 @@ export class PlannerApp {
         this.renderCalendar();
         this.renderGrid();
         this.fetchEvents();
-        this.fetchNote();
+        this.fetchNotes();
         this.scrollToCurrentTime();
         this.startTimeIndicator();
         this._initTooltip();
@@ -152,7 +155,7 @@ export class PlannerApp {
         this.renderCalendar();
         this.renderGrid();
         this.fetchEvents();
-        this.fetchNote();
+        this.fetchNotes();
         this.scrollToCurrentTime();
     }
 
@@ -1355,22 +1358,125 @@ export class PlannerApp {
                 const mode = tab.dataset.mode;
                 this.noteMode = mode;
                 const body = document.querySelector('.notes-body');
-                body.classList.remove('preview-only', 'edit-only');
+                body.classList.remove('preview-only', 'edit-only', 'list-only');
                 if (mode === 'preview') body.classList.add('preview-only');
+                document.getElementById('notesListBtn').classList.remove('active');
                 this.renderNotePreview();
+            });
+        });
+
+        document.getElementById('notesNewBtn').addEventListener('click', () => this.newNote());
+        document.getElementById('notesListBtn').addEventListener('click', () => this.toggleNoteList());
+    }
+
+    async fetchNotes() {
+        this.flushPendingNoteSave();
+        // Exit list mode when switching dates
+        document.querySelector('.notes-body').classList.remove('list-only');
+        try {
+            const r = await fetch(`/api/notes?date=${this.selectedDateStr()}`);
+            const list = await r.json();
+            this.notesList = Array.isArray(list) ? list : [];
+            let noteToSelect = null;
+            if (this._pendingHighlightNoteId !== null) {
+                noteToSelect = this.notesList.find(n => n.id === this._pendingHighlightNoteId);
+                this._pendingHighlightNoteId = null;
+            }
+            if (!noteToSelect) {
+                noteToSelect = this.notesList.find(n => (n.content || '').trim()) || this.notesList[0] || null;
+            }
+            if (noteToSelect) {
+                this._loadNote(noteToSelect);
+            } else {
+                this.currentNoteId = null;
+                this.noteContent = '';
+                document.getElementById('notesEditor').value = '';
+                this.renderNotePreview();
+                this._updateNoteCounter();
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    _loadNote(note) {
+        this.currentNoteId = note.id;
+        this.noteContent = note.content || '';
+        document.getElementById('notesEditor').value = this.noteContent;
+        this.renderNotePreview();
+        document.querySelector('.notes-body').classList.remove('list-only');
+        this._updateNoteCounter();
+    }
+
+    newNote() {
+        if (!this.noteContent.trim()) return;
+        this.flushPendingNoteSave();
+        this.currentNoteId = null;
+        this.noteContent = '';
+        document.getElementById('notesEditor').value = '';
+        this.renderNotePreview();
+        document.getElementById('notesEditor').focus();
+        this._updateNoteCounter();
+    }
+
+    toggleNoteList() {
+        const body = document.querySelector('.notes-body');
+        if (body.classList.contains('list-only')) {
+            body.classList.remove('list-only');
+        } else {
+            this._renderNoteList();
+            body.classList.add('list-only');
+        }
+        document.getElementById('notesListBtn').classList.toggle(
+            'active', body.classList.contains('list-only')
+        );
+    }
+
+    _renderNoteList() {
+        const t = k => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
+        const listEl = document.getElementById('notesListPanel');
+        const notes = this.notesList.filter(n => (n.content || '').trim());
+        if (notes.length === 0) {
+            listEl.innerHTML = `<div class="notes-list-empty">${t('schedule.noNotes')}</div>`;
+            return;
+        }
+        listEl.innerHTML = notes.map((note, idx) => {
+            const raw = (note.content || '').split('\n').find(l => l.trim()) || '';
+            const title = raw.replace(/^#+\s*/, '').replace(/[*_`~\[\]!]/g, '').trim()
+                || t('schedule.unnamedNote');
+            const isActive = note.id === this.currentNoteId;
+            return `<div class="notes-list-item${isActive ? ' active' : ''}" data-note-id="${note.id}">
+                <span class="notes-list-num">${idx + 1}</span>
+                <span class="notes-list-title">${escHtml(title)}</span>
+            </div>`;
+        }).join('');
+        listEl.querySelectorAll('.notes-list-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const id = parseInt(el.dataset.noteId, 10);
+                const note = this.notesList.find(n => n.id === id);
+                if (note) {
+                    this.flushPendingNoteSave();
+                    this._loadNote(note);
+                    document.getElementById('notesListBtn').classList.remove('active');
+                }
             });
         });
     }
 
-    async fetchNote() {
-        this.flushPendingNoteSave();
-        try {
-            const r = await fetch(`/api/notes?date=${this.selectedDateStr()}`);
-            const data = await r.json();
-            this.noteContent = data.content || '';
-            document.getElementById('notesEditor').value = this.noteContent;
-            this.renderNotePreview();
-        } catch (e) { console.error(e); }
+    _updateNoteCounter() {
+        const badge = document.getElementById('notesIndexBadge');
+        if (!badge) return;
+        const saved = this.notesList.filter(n => (n.content || '').trim());
+        const hasUnsaved = this.currentNoteId === null && this.noteContent.trim();
+        const total = saved.length + (hasUnsaved ? 1 : 0);
+        if (total <= 1) {
+            badge.textContent = '';
+            badge.style.display = 'none';
+            return;
+        }
+        const idx = this.currentNoteId !== null
+            ? saved.findIndex(n => n.id === this.currentNoteId) + 1
+            : total;
+        badge.textContent = `${idx}/${total}`;
+        badge.style.display = '';
     }
 
     updateSaveIndicator(state) {
@@ -1435,31 +1541,72 @@ export class PlannerApp {
         if (this.noteSaveTimer) clearTimeout(this.noteSaveTimer);
         const dateToSave = this.selectedDateStr();
         const contentToSave = this.noteContent;
-        this._pendingNoteSave = { date: dateToSave, content: contentToSave };
+        const idToSave = this.currentNoteId;
+        this._pendingNoteSave = { date: dateToSave, content: contentToSave, id: idToSave };
         this.updateSaveIndicator('saving');
         this.noteSaveTimer = setTimeout(async () => {
             this.noteSaveTimer = null;
             this._pendingNoteSave = null;
-            try {
+            await this._doSaveNote(dateToSave, contentToSave, idToSave);
+        }, 800);
+    }
+
+    async _doSaveNote(date, content, noteId) {
+        const t = k => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
+        try {
+            if (!content.trim()) {
+                if (noteId !== null) {
+                    const r = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' });
+                    if (r.ok) {
+                        this.notesList = this.notesList.filter(n => n.id !== noteId);
+                        if (this.currentNoteId === noteId) this.currentNoteId = null;
+                        this._markerCacheMonth = null;
+                        this.fetchCalendarMarkers();
+                        this._updateNoteCounter();
+                    }
+                }
+                this.updateSaveIndicator('saved');
+                return;
+            }
+            if (noteId === null) {
                 const r = await fetch('/api/notes', {
-                    method: 'PUT',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ date: dateToSave, content: contentToSave }),
+                    body: JSON.stringify({ date, content }),
                 });
                 if (!r.ok) {
                     this.updateSaveIndicator('');
-                    showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.noteSaveFailed') : 'Failed to save note', { type: 'error' });
+                    showToast(t('toast.noteSaveFailed'), { type: 'error' });
                     return;
                 }
-                this.updateSaveIndicator('saved');
-                this._markerCacheMonth = null;
-                this.fetchCalendarMarkers();
-            } catch (e) {
-                console.error(e);
-                this.updateSaveIndicator('');
-                showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.noteNetworkError') : 'Network error, failed to save note', { type: 'error' });
+                const data = await r.json();
+                this.currentNoteId = data.id;
+                if (!this.notesList.find(n => n.id === data.id)) {
+                    this.notesList.push({ id: data.id, date, content, updated_at: '' });
+                }
+            } else {
+                const r = await fetch(`/api/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content }),
+                });
+                if (!r.ok) {
+                    this.updateSaveIndicator('');
+                    showToast(t('toast.noteSaveFailed'), { type: 'error' });
+                    return;
+                }
+                const existing = this.notesList.find(n => n.id === noteId);
+                if (existing) existing.content = content;
             }
-        }, 800);
+            this.updateSaveIndicator('saved');
+            this._markerCacheMonth = null;
+            this.fetchCalendarMarkers();
+            this._updateNoteCounter();
+        } catch (e) {
+            console.error(e);
+            this.updateSaveIndicator('');
+            showToast(t('toast.noteNetworkError'), { type: 'error' });
+        }
     }
 
     flushPendingNoteSave() {
@@ -1468,24 +1615,43 @@ export class PlannerApp {
             this.noteSaveTimer = null;
         }
         if (this._pendingNoteSave) {
-            const { date, content } = this._pendingNoteSave;
+            const { date, content, id } = this._pendingNoteSave;
             this._pendingNoteSave = null;
-            fetch('/api/notes', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date, content }),
-            }).catch(e => console.error(e));
+            if (!content.trim()) {
+                if (id !== null) {
+                    fetch(`/api/notes/${id}`, { method: 'DELETE' }).catch(console.error);
+                    this.notesList = this.notesList.filter(n => n.id !== id);
+                    if (this.currentNoteId === id) this.currentNoteId = null;
+                }
+            } else if (id === null) {
+                fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date, content }),
+                }).then(async r => {
+                    if (r.ok) {
+                        const data = await r.json();
+                        if (this.currentNoteId === null && this.selectedDateStr() === date) {
+                            this.currentNoteId = data.id;
+                            if (!this.notesList.find(n => n.id === data.id)) {
+                                this.notesList.push({ id: data.id, date, content, updated_at: '' });
+                            }
+                            this._updateNoteCounter();
+                        }
+                    }
+                }).catch(console.error);
+            } else {
+                fetch(`/api/notes/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content }),
+                }).catch(console.error);
+            }
         }
     }
 
     async saveNote() {
-        try {
-            await fetch('/api/notes', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date: this.selectedDateStr(), content: this.noteContent }),
-            });
-        } catch (e) { console.error(e); }
+        await this._doSaveNote(this.selectedDateStr(), this.noteContent, this.currentNoteId);
     }
 
     renderNotePreview() {
@@ -1561,7 +1727,7 @@ export class PlannerApp {
             dropdown.innerHTML = results.map(item => {
                 if (item._type === 'note') {
                     const snippet = item.content.replace(/[#*`>_~\[\]!]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
-                    return `<div class="search-result-item" data-type="note" data-date="${escHtml(item.date)}">
+                    return `<div class="search-result-item" data-type="note" data-date="${escHtml(item.date)}" data-note-id="${item.id}">
                         <span class="search-result-note-icon">&#128221;</span>
                         <span class="search-result-title">${escHtml(snippet || item.date)}</span>
                         <span class="search-result-meta">${escHtml(item.date)}</span>
@@ -1578,7 +1744,8 @@ export class PlannerApp {
                     const date = el.dataset.date;
                     this._closeSearch();
                     if (el.dataset.type === 'note') {
-                        this._jumpToDate(date, null);
+                        const noteId = el.dataset.noteId ? parseInt(el.dataset.noteId, 10) : null;
+                        this._jumpToDate(date, null, noteId);
                     } else {
                         this._jumpToDate(date, parseInt(el.dataset.eventId, 10));
                     }
@@ -1600,10 +1767,11 @@ export class PlannerApp {
         this._closeSearchDropdown();
     }
 
-    _jumpToDate(dateStr, highlightEventId) {
+    _jumpToDate(dateStr, highlightEventId, highlightNoteId = null) {
         const [y, m, d] = dateStr.split('-').map(Number);
         this.selectedDate = new Date(y, m - 1, d);
         this._pendingHighlightId = highlightEventId;
+        this._pendingHighlightNoteId = highlightNoteId;
         this.onDateChange();
     }
 

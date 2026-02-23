@@ -453,19 +453,13 @@ def import_data():
             continue
         if not _DATE_RE.match(str(n["date"])):
             continue
-        existing = conn.execute(
-            "SELECT id FROM notes WHERE user_id=? AND date=?", (g.user_id, n["date"])
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE id=?",
-                (n.get("content", ""), existing["id"]),
-            )
-        else:
-            conn.execute(
-                "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
-                (g.user_id, n["date"], n.get("content", "")),
-            )
+        content = n.get("content", "")
+        if not content.strip():
+            continue
+        conn.execute(
+            "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
+            (g.user_id, n["date"], content),
+        )
         note_count += 1
 
     conn.commit()

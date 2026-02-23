@@ -103,7 +103,7 @@ def notes_dates():
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
-        """SELECT date FROM notes WHERE user_id=? AND date BETWEEN ? AND ?
+        """SELECT DISTINCT date FROM notes WHERE user_id=? AND date BETWEEN ? AND ?
            AND content IS NOT NULL AND content != '' ORDER BY date""",
         (g.user_id, start, end),
     ).fetchall()
@@ -162,22 +162,23 @@ def search_notes():
 
 @notes_bp.route("/api/notes", methods=["GET"])
 @login_required
-def get_note():
+def list_notes():
+    """Return all notes for a given date, ordered by creation time."""
     date = request.args.get("date", "")
     if not DATE_RE.match(date):
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM notes WHERE user_id=? AND date = ?", (g.user_id, date)
-    ).fetchone()
-    if row:
-        return jsonify(dict(row))
-    return jsonify({"date": date, "content": ""})
+    rows = conn.execute(
+        "SELECT * FROM notes WHERE user_id=? AND date=? ORDER BY id",
+        (g.user_id, date),
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 
-@notes_bp.route("/api/notes", methods=["PUT"])
+@notes_bp.route("/api/notes", methods=["POST"])
 @login_required
-def save_note():
+def create_note():
+    """Create a new note for a date. Only saves if content is non-empty."""
     data = request.json
     if not data:
         return jsonify({"error": "请求数据不能为空"}), 400
@@ -185,22 +186,58 @@ def save_note():
     content = data.get("content", "")
     if not DATE_RE.match(date):
         return jsonify({"error": "日期格式不正确"}), 400
+    if not content.strip():
+        return jsonify({"error": "笔记内容不能为空"}), 400
     if len(content) > MAX_NOTE_LENGTH:
         return jsonify({"error": f"笔记内容不能超过 {MAX_NOTE_LENGTH} 个字符"}), 400
 
     conn = get_db()
-    existing = conn.execute(
-        "SELECT id FROM notes WHERE user_id=? AND date = ?", (g.user_id, date)
+    cursor = conn.execute(
+        "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
+        (g.user_id, date, content),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM notes WHERE id=?", (cursor.lastrowid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@notes_bp.route("/api/notes/<int:note_id>", methods=["PUT"])
+@login_required
+def update_note(note_id):
+    """Update the content of an existing note."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "请求数据不能为空"}), 400
+    content = data.get("content", "")
+    if len(content) > MAX_NOTE_LENGTH:
+        return jsonify({"error": f"笔记内容不能超过 {MAX_NOTE_LENGTH} 个字符"}), 400
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id)
     ).fetchone()
-    if existing:
-        conn.execute(
-            "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE user_id=? AND date=?",
-            (content, g.user_id, date),
-        )
-    else:
-        conn.execute(
-            "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
-            (g.user_id, date, content),
-        )
+    if not row:
+        return jsonify({"error": "笔记不存在"}), 404
+
+    conn.execute(
+        "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE id=?",
+        (content, note_id),
+    )
+    conn.commit()
+    return jsonify({"success": True})
+
+
+@notes_bp.route("/api/notes/<int:note_id>", methods=["DELETE"])
+@login_required
+def delete_note(note_id):
+    """Delete a note by ID."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id)
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "笔记不存在"}), 404
+
+    conn.execute("DELETE FROM notes WHERE id=?", (note_id,))
     conn.commit()
     return jsonify({"success": True})

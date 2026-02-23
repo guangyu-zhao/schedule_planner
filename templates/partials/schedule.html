@@ -29,8 +29,10 @@
             </div>
             <div class="notes-panel">
                 <div class="notes-header">
-                    <span class="notes-title">📝 <span data-i18n="schedule.notes">Notes</span> <span class="note-save-indicator" id="noteSaveIndicator"></span></span>
+                    <span class="notes-title">📝 <span data-i18n="schedule.notes">Notes</span> <span class="notes-index-badge" id="notesIndexBadge"></span> <span class="note-save-indicator" id="noteSaveIndicator"></span></span>
                     <div class="notes-header-right">
+                        <button class="notes-action-btn" id="notesNewBtn" data-i18n-title="schedule.newNote" title="New note">+</button>
+                        <button class="notes-action-btn" id="notesListBtn" data-i18n-title="schedule.selectNote" title="Select note">☰</button>
                         <button class="notes-img-btn" id="notesImgBtn" data-i18n-title="schedule.insertImage" title="Insert image">🖼</button>
                         <input type="file" id="notesImgInput" accept="image/*" style="display:none">
                         <div class="notes-tabs">
@@ -42,6 +44,7 @@
                 <div class="notes-body">
                     <textarea id="notesEditor" class="notes-editor" data-i18n-placeholder="schedule.notesPlaceholder" placeholder="Write your notes here...&#10;&#10;Supports Markdown + LaTeX:&#10;# Heading&#10;**bold** *italic*&#10;- list item&#10;> quote&#10;`code`&#10;$E=mc^2$ inline formula&#10;$$ \int_0^\infty e^{-x} dx $$ block formula"></textarea>
                     <div id="notesPreview" class="notes-preview markdown-body"></div>
+                    <div id="notesListPanel" class="notes-list-panel"></div>
                 </div>
             </div>
         </div>

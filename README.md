@@ -25,12 +25,13 @@ The left side of the schedule page is for filling in your **plan**, and the righ
 
 On the right side of the schedule page, there is also a **Markdown notes** area bound to the current date:
 
+- **Multiple notes per day** — click **+ New Note** to create an additional note for the same date (only works if the current note has content). Click **☰ Select Note** to see a list of all notes for that day, with the first line shown as the title; click any row to switch to that note.
 - Toggle between **Edit** and **Preview** tabs.
 - Supports headings, bold, italic, lists, blockquotes, tables, code blocks, and inline code.
 - LaTeX math formulas — inline `$...$` and block `$$...$$`.
 - **Image upload** — drag an image from outside the browser into the editor, paste from clipboard (Ctrl+V), or click the image button to insert. Images are stored via the OSS abstraction layer; the token embedded in the Markdown is an opaque identifier that does not expose any internal IDs. Images also render when written as HTML `<img>` tags.
 - Tab / Shift+Tab to indent / unindent selected lines.
-- Auto-save with 800 ms debounce; safe across date switches.
+- Auto-save with 800 ms debounce; safe across date switches. Empty notes are never persisted.
 
 ### Timer
 
@@ -375,6 +376,9 @@ schedule_planner/
 | GET | `/api/notes?date=` | Get note for a date |
 | PUT | `/api/notes` | Save note |
 | GET | `/api/notes/search?q=` | Search notes by keyword |
+| POST | `/api/notes` | Create new note for a date |
+| PUT | `/api/notes/<id>` | Update note content |
+| DELETE | `/api/notes/<id>` | Delete a note |
 | POST | `/api/notes/images` | Upload note image; returns opaque token |
 | GET | `/api/notes/images/<token>` | Serve note image by token |
 

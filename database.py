@@ -224,6 +224,7 @@ def _migrate(conn):
     _migrate_timer_records(conn)
     _migrate_notes(conn)
     _migrate_note_images(conn)
+    _migrate_notes_to_multi(conn)
     _create_indexes(conn)
 
 
@@ -297,6 +298,19 @@ def _migrate_notes(conn):
                 pass
 
 
+def _migrate_notes_to_multi(conn):
+    """Drop the UNIQUE constraint on (user_id, date) to allow multiple notes per day.
+    Also removes empty-content notes left over from the old single-note system."""
+    try:
+        conn.execute("DROP INDEX IF EXISTS idx_notes_user_date")
+    except Exception:
+        pass
+    try:
+        conn.execute("DELETE FROM notes WHERE content IS NULL OR content = ''")
+    except Exception:
+        pass
+
+
 def _migrate_note_images(conn):
     """Ensure note_images table exists (for older DBs that lack it)."""
     conn.execute(
@@ -314,7 +328,7 @@ def _migrate_note_images(conn):
 
 def _create_indexes(conn):
     indexes = [
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_user_date ON notes(user_id, date)",
+        "CREATE INDEX IF NOT EXISTS idx_notes_user_date ON notes(user_id, date)",
         "CREATE INDEX IF NOT EXISTS idx_events_user_date ON events(user_id, date)",
         "CREATE INDEX IF NOT EXISTS idx_timer_user_date ON timer_records(user_id, date)",
         "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",

@@ -284,6 +284,22 @@
     gap: 6px;
 }
 
+.notes-action-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    line-height: 1;
+    font-family: inherit;
+}
+.notes-action-btn:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--accent); }
+.notes-action-btn.active { background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary)); border-color: var(--accent); color: var(--accent); }
+
 .notes-img-btn {
     padding: 3px 7px;
     border: 1px solid var(--border-color);
@@ -296,6 +312,73 @@
     line-height: 1;
 }
 .notes-img-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+.notes-index-badge {
+    display: none;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1px 5px;
+    margin-left: 2px;
+    vertical-align: middle;
+}
+
+/* Notes list panel */
+.notes-list-panel {
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    background: var(--bg-primary);
+}
+.notes-body.list-only .notes-editor { display: none; }
+.notes-body.list-only .notes-preview { display: none; }
+.notes-body.list-only .notes-list-panel { display: flex; }
+
+.notes-list-item {
+    display: flex;
+    align-items: center;
+    padding: 9px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    gap: 10px;
+    transition: background 0.12s;
+    flex-shrink: 0;
+}
+.notes-list-item:hover { background: var(--bg-hover); }
+.notes-list-item.active {
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-primary));
+    border-left: 3px solid var(--accent);
+    padding-left: 13px;
+}
+.notes-list-num {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 18px;
+    text-align: right;
+}
+.notes-list-title {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.notes-list-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 13px;
+}
 
 .notes-editor.drag-over {
     outline: 2px dashed var(--accent);

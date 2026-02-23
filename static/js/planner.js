@@ -201,12 +201,11 @@ export class PlannerApp {
             el.style.background = this.hexToRgba(evt.color, evt.completed ? 0.3 : 0.85);
             el.style.color = this.getContrastColor(evt.color);
 
-            const showMeta = height >= SLOT_HEIGHT * 1.6;
             const recurIcon = evt.recur_rule ? ' 🔁' : (evt.recur_parent_id ? ' 🔁' : '');
+            const catPart = `${CATEGORY_ICONS[evt.category] || ''}${escHtml(getCategoryLabel(evt.category))}`;
             el.innerHTML =
                 `<div class="resize-handle resize-handle-top"></div>` +
-                `<div class="event-title">${escHtml(evt.title)}${recurIcon}</div>` +
-                (showMeta ? `<div class="event-meta">${escHtml(evt.start_time)}-${escHtml(evt.end_time)} · ${CATEGORY_ICONS[evt.category] || ''}${escHtml(getCategoryLabel(evt.category))}</div>` : '') +
+                `<div class="event-content">${escHtml(evt.start_time)}–${escHtml(evt.end_time)} · ${catPart} · ${escHtml(evt.title)}${recurIcon}</div>` +
                 `<div class="resize-handle resize-handle-bottom"></div>`;
 
             el.addEventListener('click', e => {

@@ -1403,11 +1403,19 @@ export class PlannerApp {
         document.getElementById('notesEditor').value = this.noteContent;
         this.renderNotePreview();
         document.querySelector('.notes-body').classList.remove('list-only');
+        document.getElementById('notesImgBtn').disabled = false;
         this._updateNoteCounter();
     }
 
     newNote() {
-        if (!this.noteContent.trim()) return;
+        const body = document.querySelector('.notes-body');
+        const inListMode = body.classList.contains('list-only');
+        if (!inListMode && !this.noteContent.trim()) return;
+        if (inListMode) {
+            body.classList.remove('list-only');
+            document.getElementById('notesImgBtn').disabled = false;
+            document.getElementById('notesListBtn').classList.remove('active');
+        }
         this.flushPendingNoteSave();
         this.currentNoteId = null;
         this.noteContent = '';
@@ -1421,9 +1429,11 @@ export class PlannerApp {
         const body = document.querySelector('.notes-body');
         if (body.classList.contains('list-only')) {
             body.classList.remove('list-only');
+            document.getElementById('notesImgBtn').disabled = false;
         } else {
             this._renderNoteList();
             body.classList.add('list-only');
+            document.getElementById('notesImgBtn').disabled = true;
         }
         document.getElementById('notesListBtn').classList.toggle(
             'active', body.classList.contains('list-only')

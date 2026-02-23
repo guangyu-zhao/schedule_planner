@@ -49,6 +49,9 @@ export class PlannerApp {
         this._searchWord = false;
         this._searchRegex = false;
 
+        this._planPickMode = false;
+        this._planPickResolve = null;
+
         this.init();
     }
 
@@ -206,22 +209,13 @@ export class PlannerApp {
                 (showMeta ? `<div class="event-meta">${escHtml(evt.start_time)}-${escHtml(evt.end_time)} · ${CATEGORY_ICONS[evt.category] || ''}${escHtml(getCategoryLabel(evt.category))}</div>` : '') +
                 `<div class="resize-handle resize-handle-bottom"></div>`;
 
-            el.setAttribute('draggable', 'true');
-            el.addEventListener('dragstart', e => {
-                if (this.isResizing) { e.preventDefault(); return; }
-                this.dragMoveEventId = evt.id;
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', String(evt.id));
-                el.classList.add('dragging');
-            });
-            el.addEventListener('dragend', () => {
-                el.classList.remove('dragging');
-                this.dragMoveEventId = null;
-            });
-
             el.addEventListener('click', e => {
                 if (this.isResizing) return;
                 e.stopPropagation();
+                if (this._planPickMode) {
+                    if (colType === 'plan') this.exitPlanPickMode(evt);
+                    return;
+                }
                 this.showPopover(evt, e);
             });
 
@@ -451,40 +445,61 @@ export class PlannerApp {
 
 
     /* ================================================================
+       PLAN PICK MODE – choose a plan event to prefill actual creation
+       ================================================================ */
+    enterPlanPickMode() {
+        return new Promise(resolve => {
+            this._planPickMode = true;
+            this._planPickResolve = resolve;
+
+            const _planPickHints = {
+                'en':    'Click a plan event to copy its details, or press Esc to skip',
+                'zh-CN': '点击一个计划事项来复制其信息，或按 Esc 跳过',
+                'zh-TW': '點擊一個計劃事項來複製其資訊，或按 Esc 跳過',
+                'fr':    'Cliquez sur un événement planifié pour copier ses détails, ou appuyez sur Échap pour ignorer',
+                'de':    'Klicken Sie auf ein geplantes Ereignis zum Kopieren, oder drücken Sie Esc zum Überspringen',
+                'ja':    '計画イベントをクリックして詳細をコピー、またはEscでスキップ',
+                'ar':    'انقر على حدث مخطط لنسخ تفاصيله، أو اضغط Esc للتخطي',
+                'he':    'לחץ על אירוע מתוכנן להעתקת פרטיו, או לחץ Esc לדילוג',
+            };
+            const _lang = (() => { try { return localStorage.getItem('schedule_planner_lang') || 'en'; } catch(e) { return 'en'; } })();
+            const _hintText = _planPickHints[_lang] || _planPickHints['en'];
+
+            const overlay = document.createElement('div');
+            overlay.id = 'planPickOverlay';
+            overlay.addEventListener('wheel', e => {
+                const grid = document.getElementById('scheduleGrid');
+                if (grid) grid.scrollTop += e.deltaY;
+            }, { passive: true });
+            document.body.appendChild(overlay);
+
+            const hint = document.createElement('div');
+            hint.id = 'planPickHint';
+            hint.textContent = _hintText;
+            document.body.appendChild(hint);
+
+            document.body.classList.add('plan-pick-mode');
+        });
+    }
+
+    exitPlanPickMode(selectedEvt) {
+        this._planPickMode = false;
+        document.getElementById('planPickOverlay')?.remove();
+        document.getElementById('planPickHint')?.remove();
+        document.body.classList.remove('plan-pick-mode');
+        if (this._planPickResolve) {
+            const resolve = this._planPickResolve;
+            this._planPickResolve = null;
+            resolve(selectedEvt);
+        }
+    }
+
+    /* ================================================================
        DRAG-TO-CREATE
        ================================================================ */
     bindGridEvents() {
         const container = document.querySelector('#scheduleGrid .dual-columns');
         if (!container) return;
-
-        container.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
-
-        container.addEventListener('drop', e => {
-            e.preventDefault();
-            const eventId = parseInt(e.dataTransfer.getData('text/plain'));
-            if (!eventId) return;
-            const targetCol = e.target.closest('.day-column');
-            if (!targetCol) return;
-            const targetColType = targetCol.dataset.col;
-            const evt = this.events.find(ev => ev.id === eventId);
-            if (!evt) return;
-            const currentColType = evt.col_type || 'plan';
-
-            const rect = targetCol.getBoundingClientRect();
-            const slot = Math.floor((e.clientY - rect.top) / SLOT_HEIGHT);
-            const startSlot = Math.max(0, Math.min(slot, TOTAL_SLOTS - 1));
-            const duration = this.timeToSlot(evt.end_time) - this.timeToSlot(evt.start_time);
-            const endSlot = Math.min(startSlot + Math.max(duration, MIN_EVENT_SLOTS), TOTAL_SLOTS);
-
-            if (currentColType !== targetColType) {
-                this.moveEventToColumn(evt, targetColType, this.slotToTime(startSlot), this.slotToTime(endSlot));
-            } else {
-                this.updateEvent(evt.id, { ...evt, start_time: this.slotToTime(startSlot), end_time: this.slotToTime(endSlot) });
-            }
-        });
 
         container.addEventListener('mousedown', e => {
             const handle = e.target.closest('.resize-handle');
@@ -524,7 +539,7 @@ export class PlannerApp {
             this.updateDragOverlay();
         });
 
-        document.addEventListener('mouseup', e => {
+        document.addEventListener('mouseup', async e => {
             if (this.isResizing) { this.onResizeEnd(); return; }
             if (!this.isDragging) return;
             this.isDragging = false;
@@ -533,7 +548,22 @@ export class PlannerApp {
             const minS = Math.min(this.dragStartSlot, this.dragEndSlot);
             const maxS = Math.max(this.dragStartSlot, this.dragEndSlot) + 1;
             this.editingColType = this.dragCol;
-            this.showCreateModal(this.selectedDateStr(), this.slotToTime(minS), this.slotToTime(Math.min(maxS, TOTAL_SLOTS)));
+            const dateStr = this.selectedDateStr();
+            const startTime = this.slotToTime(minS);
+            const endTime = this.slotToTime(Math.min(maxS, TOTAL_SLOTS));
+
+            if (this.dragCol === 'actual') {
+                const planEvents = this.events.filter(
+                    ev => ev.date === dateStr && (ev.col_type || 'plan') === 'plan'
+                );
+                if (planEvents.length > 0) {
+                    const selectedPlanEvt = await this.enterPlanPickMode();
+                    this.showCreateModal(dateStr, startTime, endTime, selectedPlanEvt);
+                    return;
+                }
+            }
+
+            this.showCreateModal(dateStr, startTime, endTime);
         });
     }
 
@@ -751,17 +781,17 @@ export class PlannerApp {
             priorities.map(p => `<option value="${p.value}">${p.icon} ${escHtml(t(p.key))}</option>`).join('');
     }
 
-    showCreateModal(date, startTime, endTime) {
+    showCreateModal(date, startTime, endTime, presetEvt = null) {
         this.editingEvent = null;
-        this.selectedColor = this.getNextColor(date);
+        this.selectedColor = presetEvt ? presetEvt.color : this.getNextColor(date);
         document.getElementById('modalTitle').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.newEvent') : 'New Event';
-        document.getElementById('eventTitle').value = '';
+        document.getElementById('eventTitle').value = presetEvt ? presetEvt.title : '';
         document.getElementById('eventDate').value = date;
         document.getElementById('eventStart').value = startTime;
         document.getElementById('eventEnd').value = endTime;
         this._populateModalSelects();
-        document.getElementById('eventCategory').value = '工作';
-        document.getElementById('eventPriority').value = '1';
+        document.getElementById('eventCategory').value = presetEvt ? presetEvt.category : '工作';
+        document.getElementById('eventPriority').value = presetEvt ? String(presetEvt.priority) : '1';
         document.getElementById('eventDescription').value = '';
         document.getElementById('deleteBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'none';
@@ -976,6 +1006,10 @@ export class PlannerApp {
         });
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
+                if (this._planPickMode) {
+                    this.exitPlanPickMode(null);
+                    return;
+                }
                 if (document.getElementById('searchDropdown').classList.contains('active')) {
                     this._closeSearch(); return;
                 }

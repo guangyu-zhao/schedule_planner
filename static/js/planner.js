@@ -216,6 +216,11 @@ export class PlannerApp {
                     if (colType === 'plan') this.exitPlanPickMode(evt);
                     return;
                 }
+                if (this.selectedEventId === evt.id) {
+                    this.hidePopover();
+                    this.showEditModal(evt);
+                    return;
+                }
                 this.showPopover(evt, e);
             });
 

@@ -993,7 +993,7 @@ export class PlannerApp {
             this.closeModal();
             showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventDeleted') : 'Event deleted', { undo: true });
         });
-        document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) this.closeModal(); });
+        document.getElementById('modalOverlay').addEventListener('mousedown', e => { if (e.target === e.currentTarget) this.closeModal(); });
         document.getElementById('popoverComplete').addEventListener('click', () => this.handlePopoverAction('complete'));
         document.getElementById('popoverEdit').addEventListener('click', () => this.handlePopoverAction('edit'));
         document.getElementById('popoverDelete').addEventListener('click', () => this.handlePopoverAction('delete'));

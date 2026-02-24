@@ -80,6 +80,8 @@
 ### 环境要求
 
 - Python 3.9+
+- PostgreSQL 14+
+- Redis 6+
 
 ### 安装与运行
 
@@ -87,13 +89,23 @@
 git clone https://github.com/<your-username>/schedule_planner.git
 cd schedule_planner
 cp .env.example .env        # 创建配置文件，按需修改
+
+# 启动 PostgreSQL 和 Redis（推荐 Docker）
+docker compose up -d postgres redis
+
 pip install -r requirements.txt
 python app.py
 ```
 
 浏览器打开 `http://localhost:5555`，注册账户后即可使用。
 
-数据库文件 `planner.db` 会在首次运行时自动创建。
+#### 从 SQLite 迁移
+
+如果已有 `planner.db` 数据，在 PostgreSQL 启动后运行一次性迁移脚本：
+
+```bash
+python migrate_sqlite_to_pg.py --sqlite-path planner.db --pg-url postgresql://planner:plannerpass@localhost:5432/planner_db
+```
 
 ### 生产环境部署
 
@@ -105,6 +117,12 @@ gunicorn -w 4 -b 0.0.0.0:5555 app:app
 # Windows
 pip install waitress
 waitress-serve --port=5555 app:app
+
+# 启动 Celery Worker 处理异步邮件（另开终端）
+# Linux / macOS
+celery -A celery_app.celery worker --loglevel=info --concurrency=2
+# Windows
+celery -A celery_app.celery worker --loglevel=info --pool=solo
 ```
 
 ### 配置说明
@@ -122,11 +140,37 @@ waitress-serve --port=5555 app:app
 | `HTTPS` | 设为 `1` 时 Session Cookie 加上 Secure 标记 | `0` |
 | `LOG_LEVEL` | 日志级别（`DEBUG` / `INFO` / `WARNING` / `ERROR`） | `INFO` |
 
+#### 数据库
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `DATABASE_URL` | PostgreSQL 连接字符串 | `postgresql://planner:plannerpass@localhost:5432/planner_db` |
+
+#### 缓存与会话
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `REDIS_URL` | Redis 连接 URL（会话 & 限流） | `redis://localhost:6379/0` |
+| `CELERY_BROKER_URL` | Celery broker URL | 同 `REDIS_URL` |
+| `CELERY_RESULT_BACKEND` | Celery 结果后端 URL | `redis://localhost:6379/1` |
+| `SESSION_KEY_PREFIX` | Redis 会话键前缀 | `sp_sess:` |
+| `RATELIMIT_STORAGE_URI` | flask-limiter Redis URI | `redis://localhost:6379/2` |
+
 #### 安全
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `SECRET_KEY` | Session 签名密钥（生产环境必须设置） | 自动生成并保存到 `.secret_key` 文件 |
+| `MAX_LOGIN_ATTEMPTS` | 锁定前允许的失败登录次数 | `10` |
+| `LOGIN_LOCKOUT_SECONDS` | 锁定时长（秒） | `900` |
+
+#### 监控
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `SENTRY_DSN` | Sentry DSN（错误监控） | 空（禁用） |
+| `SENTRY_TRACES_SAMPLE_RATE` | Sentry 性能追踪采样率 | `0.1` |
+| `SENTRY_ENVIRONMENT` | Sentry 环境标签 | `development` |
 
 #### 邮件
 
@@ -160,28 +204,46 @@ schedule_planner/
 │
 ├── .env                    # 环境配置文件（不纳入 git 版本管理）
 ├── .env.example            # 配置文件模板 — 复制为 .env 即可使用
+├── docker-compose.yml      # 本地开发：PostgreSQL 16 + Redis 7 容器
 │
 ├── app.py                  # 应用入口 — 创建 Flask 应用，注册中间件
-│                           #   （CSRF 检查、安全响应头、速率限制），
-│                           #   周期性维护（数据库优化与备份），
-│                           #   以及错误处理器。
+│                           #   （CSRF 检查、安全响应头、Redis 限流），
+│                           #   Redis 会话初始化、Sentry 接入、
+│                           #   周期性维护以及错误处理器。
 │
 ├── config.py               # 集中配置 — 通过 python-dotenv 加载 .env，
-│                           #   从环境变量或 .secret_key 文件读取密钥，
-│                           #   定义邮件、Session 有效期、头像约束、
-│                           #   验证码过期时间等。
+│                           #   定义 DATABASE_URL、REDIS_URL、Celery URL、
+│                           #   Sentry 配置、邮件、Session 有效期等。
 │
-├── database.py             # 数据库层 — SQLite 连接管理，完整的表结构
-│                           #   创建（users、events、timer_records、
+├── database.py             # 数据库层 — PostgreSQL 连接池
+│                           #   （psycopg2.ThreadedConnectionPool，2–20 个连接），
+│                           #   _ConnWrapper 提供兼容 SQLite 的 .execute() 接口，
+│                           #   完整的表结构创建（users、events、timer_records、
 │                           #   notes、note_images、event_templates、
 │                           #   user_settings、verification_codes、
-│                           #   deleted_events），列迁移、索引创建、
-│                           #   周期性优化、带时间戳的自动备份与轮转。
+│                           #   deleted_events、user_sessions），
+│                           #   索引创建与周期性 ANALYZE 优化。
+│
+├── redis_client.py         # Redis 单例 — get_redis() 返回共享客户端，
+│                           #   用于会话撤销和登录限流。
+│
+├── celery_app.py           # Celery 应用工厂 — 配置 broker 和结果后端
+│                           #   （均为 Redis），注册任务模块，
+│                           #   并初始化 Sentry worker 端错误捕获。
+│
+├── tasks/
+│   ├── __init__.py         # 包初始化
+│   └── email_tasks.py      # 异步邮件任务 — send_verification_email_task
+│                           #   含 3 次重试（间隔 60 秒），封装 SMTP 逻辑。
+│
+├── migrate_sqlite_to_pg.py # 一次性 SQLite → PostgreSQL 迁移脚本；
+│                           #   幂等（ON CONFLICT DO NOTHING），
+│                           #   重置 SERIAL 序列，验证行数。
 │
 ├── auth_utils.py           # 认证工具 — @login_required 装饰器、
 │                           #   get_current_user()、密码强度校验、
-│                           #   验证码生成、SMTP 邮件发送、
-│                           #   验证码存储/校验、重置会话过期检查。
+│                           #   验证码生成、异步邮件派发（Celery，
+│                           #   降级到同步 SMTP）、验证码存储/校验。
 │
 ├── storage/                # 可插拔文件存储抽象层
 │   ├── __init__.py         # 工厂函数 get_storage() — 根据环境变量
@@ -194,16 +256,15 @@ schedule_planner/
 │                           #   （结构已就绪，需安装 oss2 SDK）。
 │
 ├── requirements.txt        # Python 依赖
-├── planner.db              # SQLite 数据库（首次运行自动创建）
 ├── .secret_key             # 自动生成的 Session 密钥（已 gitignore）
-├── backups/                # 带时间戳的数据库备份（最多 7 份，自动轮转）
 │
 ├── routes/                 # API 路由模块（按业务领域划分）
 │   ├── __init__.py         # 向 Flask 应用注册所有蓝图
 │   ├── main.py             # 页面路由：/（主应用）和 /login
 │   ├── auth.py             # 认证 API：注册、登录、登出、忘记密码、
-│   │                       #   验证码校验、重置密码；包含登录失败
-│   │                       #   计数与锁定机制（10 次失败 → 锁定 15 分钟）。
+│   │                       #   验证码校验、重置密码；Redis 限流与锁定；
+│   │                       #   设备管理 API（查看设备列表、撤销指定设备、
+│   │                       #   撤销其他所有设备）。
 │   ├── user.py             # 用户 API：获取/更新个人资料、上传头像
 │   │                       #   （自动裁剪+缩放）、修改密码、
 │   │                       #   导出数据（JSON / CSV / iCal）、
@@ -277,7 +338,9 @@ schedule_planner/
 │       │                   #   更换头像、修改密码、切换语言）、
 │       │                   #   数据导出/导入、删除账户、
 │       │                   #   主题切换（亮色/暗色）、
-│       │                   #   快捷键帮助弹窗、全局 401 重定向拦截。
+│       │                   #   快捷键帮助弹窗、设备/会话管理
+│       │                   #   （查看设备、撤销、全部撤销）、
+│       │                   #   全局 401 重定向拦截。
 │       ├── constants.js    # 共享常量：颜色面板、分类图标/颜色、
 │       │                   #   优先级颜色、时间槽高度、
 │       │                   #   分类/优先级标签（含 i18n）。
@@ -331,6 +394,9 @@ schedule_planner/
 | POST | `/api/auth/forgot-password` | 发送密码重置验证码 |
 | POST | `/api/auth/verify-code` | 校验验证码 |
 | POST | `/api/auth/reset-password` | 重置密码 |
+| GET | `/api/auth/sessions` | 查看所有已登录设备 |
+| DELETE | `/api/auth/sessions/<id>` | 撤销指定设备会话 |
+| DELETE | `/api/auth/sessions/all-others` | 撤销当前设备以外的全部会话 |
 
 ### 用户
 

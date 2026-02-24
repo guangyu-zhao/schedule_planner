@@ -80,6 +80,8 @@ Supports 8 languages: **English**, **简体中文**, **繁體中文**, **França
 ### Prerequisites
 
 - Python 3.9+
+- PostgreSQL 14+
+- Redis 6+
 
 ### Install & Run
 
@@ -87,13 +89,23 @@ Supports 8 languages: **English**, **简体中文**, **繁體中文**, **França
 git clone https://github.com/<your-username>/schedule_planner.git
 cd schedule_planner
 cp .env.example .env        # create config file, edit as needed
+
+# Start PostgreSQL and Redis (Docker recommended)
+docker compose up -d postgres redis
+
 pip install -r requirements.txt
 python app.py
 ```
 
 Open `http://localhost:5555` in your browser and register an account.
 
-The database file `planner.db` is created automatically on first run.
+#### Migrating from SQLite
+
+If you have existing data in a `planner.db` file, run the one-time migration script after starting PostgreSQL:
+
+```bash
+python migrate_sqlite_to_pg.py --sqlite-path planner.db --pg-url postgresql://planner:plannerpass@localhost:5432/planner_db
+```
 
 ### Production Deployment
 
@@ -105,6 +117,12 @@ gunicorn -w 4 -b 0.0.0.0:5555 app:app
 # Windows
 pip install waitress
 waitress-serve --port=5555 app:app
+
+# Start Celery worker for async email (in a separate terminal)
+# Linux / macOS
+celery -A celery_app.celery worker --loglevel=info --concurrency=2
+# Windows
+celery -A celery_app.celery worker --loglevel=info --pool=solo
 ```
 
 ### Configuration
@@ -122,11 +140,37 @@ All settings are managed through the **`.env`** file in the project root (loaded
 | `HTTPS` | Set to `1` to mark session cookies as Secure | `0` |
 | `LOG_LEVEL` | Logging level (`DEBUG` / `INFO` / `WARNING` / `ERROR`) | `INFO` |
 
+#### Database
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://planner:plannerpass@localhost:5432/planner_db` |
+
+#### Cache & Sessions
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_URL` | Redis connection URL (sessions & rate limiting) | `redis://localhost:6379/0` |
+| `CELERY_BROKER_URL` | Celery broker URL | same as `REDIS_URL` |
+| `CELERY_RESULT_BACKEND` | Celery result backend URL | `redis://localhost:6379/1` |
+| `SESSION_KEY_PREFIX` | Redis key prefix for sessions | `sp_sess:` |
+| `RATELIMIT_STORAGE_URI` | flask-limiter Redis URI | `redis://localhost:6379/2` |
+
 #### Security
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SECRET_KEY` | Session signing key (must set in production) | Auto-generated and saved to `.secret_key` |
+| `MAX_LOGIN_ATTEMPTS` | Failed login attempts before lockout | `10` |
+| `LOGIN_LOCKOUT_SECONDS` | Lockout duration in seconds | `900` |
+
+#### Monitoring
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SENTRY_DSN` | Sentry DSN for error monitoring | Empty (disabled) |
+| `SENTRY_TRACES_SAMPLE_RATE` | Sentry performance tracing sample rate | `0.1` |
+| `SENTRY_ENVIRONMENT` | Sentry environment label | `development` |
 
 #### Mail
 
@@ -160,32 +204,53 @@ schedule_planner/
 │
 ├── .env                    # Environment configuration (not tracked in git)
 ├── .env.example            # Configuration template — copy to .env to start
+├── docker-compose.yml      # Local dev: PostgreSQL 16 + Redis 7 containers
 │
 ├── app.py                  # Application entry point — creates the Flask app,
 │                           #   registers middleware (CSRF check, security
-│                           #   headers, rate limiting), periodic maintenance
-│                           #   (DB optimize & backup), and error handlers.
+│                           #   headers, Redis-backed rate limiting), periodic
+│                           #   maintenance, Redis session setup, Sentry init,
+│                           #   and error handlers.
 │
 ├── config.py               # Centralized configuration — loads .env via
 │                           #   python-dotenv, reads SECRET_KEY from env or
-│                           #   .secret_key file, defines mail settings,
-│                           #   session lifetime, avatar constraints, and
-│                           #   code expiry times.
+│                           #   .secret_key file, defines DATABASE_URL,
+│                           #   REDIS_URL, Celery URLs, Sentry settings,
+│                           #   mail settings, session lifetime, and more.
 │
-├── database.py             # Database layer — SQLite connection management,
-│                           #   full schema creation (users, events,
+├── database.py             # Database layer — PostgreSQL connection pool
+│                           #   (psycopg2.ThreadedConnectionPool, 2–20 conns),
+│                           #   _ConnWrapper for SQLite-compatible .execute()
+│                           #   interface, full schema creation (users, events,
 │                           #   timer_records, notes, note_images,
 │                           #   event_templates, user_settings,
-│                           #   verification_codes, deleted_events),
-│                           #   column migrations, index creation,
-│                           #   periodic optimization, and timestamped
-│                           #   backup with rotation.
+│                           #   verification_codes, deleted_events,
+│                           #   user_sessions), index creation, and
+│                           #   periodic optimization via ANALYZE.
+│
+├── redis_client.py         # Redis singleton — get_redis() returns a shared
+│                           #   Redis client used for session revocation and
+│                           #   login rate limiting.
+│
+├── celery_app.py           # Celery application factory — configures broker
+│                           #   and result backend (both Redis), registers
+│                           #   task modules, and initializes Sentry for
+│                           #   worker-side error capture.
+│
+├── tasks/
+│   ├── __init__.py         # Package init
+│   └── email_tasks.py      # Async email task — send_verification_email_task
+│                           #   with 3 retries (60 s delay), wraps SMTP logic.
+│
+├── migrate_sqlite_to_pg.py # One-time SQLite → PostgreSQL migration script;
+│                           #   idempotent (ON CONFLICT DO NOTHING), resets
+│                           #   SERIAL sequences, verifies row counts.
 │
 ├── auth_utils.py           # Authentication utilities — @login_required
 │                           #   decorator, get_current_user(), password
 │                           #   validation, verification code generation,
-│                           #   SMTP email sending, code storage/verification,
-│                           #   and reset session expiry check.
+│                           #   async email dispatch (Celery) with sync
+│                           #   fallback, code storage/verification.
 │
 ├── storage/                # Pluggable file-storage abstraction
 │   ├── __init__.py         # Factory function get_storage() — returns the
@@ -199,17 +264,16 @@ schedule_planner/
 │                           #   (structure ready; requires oss2 SDK).
 │
 ├── requirements.txt        # Python dependencies
-├── planner.db              # SQLite database (auto-created on first run)
 ├── .secret_key             # Auto-generated session key (gitignored)
-├── backups/                # Timestamped DB backups (max 7, auto-rotated)
 │
 ├── routes/                 # API route modules (one file per domain)
 │   ├── __init__.py         # Registers all blueprints with the app
 │   ├── main.py             # Page routes: / (main app) and /login
 │   ├── auth.py             # Auth API: register, login, logout, forgot
 │   │                       #   password, verify code, reset password;
-│   │                       #   includes login attempt rate limiting with
-│   │                       #   lockout (10 failed attempts → 15 min block).
+│   │                       #   Redis-backed login rate limiting with lockout;
+│   │                       #   session management APIs (list devices, revoke
+│   │                       #   single device, revoke all other devices).
 │   ├── user.py             # User API: get/update profile, upload avatar
 │   │                       #   (auto-crop + resize via Pillow), change
 │   │                       #   password, export data (JSON / CSV / iCal),
@@ -284,8 +348,9 @@ schedule_planner/
 │       │                   #   change avatar, change password, language
 │       │                   #   switch), data export/import, account
 │       │                   #   deletion, theme toggle (light/dark),
-│       │                   #   keyboard shortcuts modal, global 401
-│       │                   #   redirect interceptor.
+│       │                   #   keyboard shortcuts modal, device/session
+│       │                   #   management (list, revoke, revoke-all),
+│       │                   #   global 401 redirect interceptor.
 │       ├── constants.js    # Shared constants: color palette, category
 │       │                   #   icons/colors, priority colors, slot height,
 │       │                   #   category/priority label helpers with i18n.
@@ -341,6 +406,9 @@ schedule_planner/
 | POST | `/api/auth/forgot-password` | Send password-reset verification code |
 | POST | `/api/auth/verify-code` | Verify code |
 | POST | `/api/auth/reset-password` | Reset password |
+| GET | `/api/auth/sessions` | List all logged-in devices |
+| DELETE | `/api/auth/sessions/<id>` | Revoke a specific device session |
+| DELETE | `/api/auth/sessions/all-others` | Revoke all sessions except current |
 
 ### User
 

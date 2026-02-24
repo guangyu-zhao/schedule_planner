@@ -61,6 +61,8 @@ export class PlannerApp {
 
         this._planPickMode = false;
         this._planPickResolve = null;
+        this._planCopyMode = false;
+        this._planCopySavedState = null;
 
         this._tooltip = null;
 
@@ -96,6 +98,7 @@ export class PlannerApp {
     bindEvents() {
         document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
+        document.getElementById('copyFromPlanBtn').addEventListener('click', () => this.startPlanCopyMode());
         document.getElementById('saveBtn').addEventListener('click', () => this.saveEvent());
         document.getElementById('deleteBtn').addEventListener('click', async () => {
             if (!this.editingEvent) return;

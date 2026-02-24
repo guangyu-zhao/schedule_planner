@@ -71,9 +71,11 @@ export const ModalMixin = {
         this._populateModalSelects();
         document.getElementById('eventCategory').value = presetEvt ? presetEvt.category : '工作';
         document.getElementById('eventPriority').value = presetEvt ? String(presetEvt.priority) : '1';
-        document.getElementById('eventDescription').value = '';
+        document.getElementById('eventDescription').value = presetEvt ? (presetEvt.description || '') : '';
         document.getElementById('deleteBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'none';
+        document.getElementById('copyFromPlanBtn').style.display =
+            (this.editingColType || 'plan') === 'plan' ? 'inline-flex' : 'none';
         document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.save') : 'Save';
         this.buildColorPicker();
         this.openModal();
@@ -95,6 +97,7 @@ export const ModalMixin = {
         document.getElementById('eventDescription').value = event.description || '';
         document.getElementById('deleteBtn').style.display = 'inline-flex';
         document.getElementById('completeBtn').style.display = 'none';
+        document.getElementById('copyFromPlanBtn').style.display = 'none';
         document.getElementById('saveBtn').textContent = (window.I18n && window.I18n.t) ? window.I18n.t('modal.update') : 'Update';
         this.buildColorPicker();
         this.openModal();
@@ -308,11 +311,87 @@ export const ModalMixin = {
         });
     },
 
+    startPlanCopyMode() {
+        // Save current modal state before closing
+        this._planCopySavedState = {
+            title: document.getElementById('eventTitle').value,
+            date: document.getElementById('eventDate').value,
+            start: document.getElementById('eventStart').value,
+            end: document.getElementById('eventEnd').value,
+            category: document.getElementById('eventCategory').value,
+            priority: document.getElementById('eventPriority').value,
+            color: this.selectedColor,
+            description: document.getElementById('eventDescription').value,
+        };
+        this._planCopyMode = true;
+        this.closeModal();
+
+        const _hintText = (window.I18n && window.I18n.t)
+            ? window.I18n.t('schedule.planCopy.hint')
+            : 'Click a plan event to copy. Navigate the calendar to switch dates. Press Esc to return.';
+
+        this._planPickMode = true;
+        this._planPickResolve = null;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'planPickOverlay';
+        overlay.addEventListener('wheel', e => {
+            const grid = document.getElementById('scheduleGrid');
+            if (grid) grid.scrollTop += e.deltaY;
+        }, { passive: true });
+        document.body.appendChild(overlay);
+
+        const hint = document.createElement('div');
+        hint.id = 'planPickHint';
+        hint.textContent = _hintText;
+        document.body.appendChild(hint);
+
+        document.body.classList.add('plan-pick-mode', 'plan-copy-mode');
+    },
+
     exitPlanPickMode(selectedEvt) {
         this._planPickMode = false;
         document.getElementById('planPickOverlay')?.remove();
         document.getElementById('planPickHint')?.remove();
-        document.body.classList.remove('plan-pick-mode');
+        document.body.classList.remove('plan-pick-mode', 'plan-copy-mode');
+
+        if (this._planCopyMode) {
+            this._planCopyMode = false;
+            const saved = this._planCopySavedState;
+            this._planCopySavedState = null;
+
+            // Navigate back to the original event's date before reopening the modal
+            const [yr, mo, dy] = saved.date.split('-').map(Number);
+            this.selectedDate = new Date(yr, mo - 1, dy);
+            this.calendarMonth = new Date(yr, mo - 1, dy);
+            this.renderCalendar();
+            this.renderGrid();
+            this.fetchEvents();
+
+            // Reopen modal: copy selectedEvt's metadata if chosen, always keep original date/time
+            this.editingEvent = null;
+            this.selectedColor = selectedEvt ? selectedEvt.color : saved.color;
+            document.getElementById('modalTitle').textContent =
+                (window.I18n && window.I18n.t) ? window.I18n.t('modal.newEvent') : 'New Event';
+            document.getElementById('eventTitle').value = selectedEvt ? selectedEvt.title : saved.title;
+            document.getElementById('eventDate').value = saved.date;
+            document.getElementById('eventStart').value = saved.start;
+            document.getElementById('eventEnd').value = saved.end;
+            this._populateModalSelects();
+            document.getElementById('eventCategory').value = selectedEvt ? selectedEvt.category : saved.category;
+            document.getElementById('eventPriority').value = selectedEvt ? String(selectedEvt.priority) : saved.priority;
+            document.getElementById('eventDescription').value = selectedEvt ? (selectedEvt.description || '') : saved.description;
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('completeBtn').style.display = 'none';
+            document.getElementById('copyFromPlanBtn').style.display = 'inline-flex';
+            document.getElementById('saveBtn').textContent =
+                (window.I18n && window.I18n.t) ? window.I18n.t('modal.save') : 'Save';
+            this.buildColorPicker();
+            this.openModal();
+            setTimeout(() => document.getElementById('eventTitle').focus(), 100);
+            return;
+        }
+
         if (this._planPickResolve) {
             const resolve = this._planPickResolve;
             this._planPickResolve = null;

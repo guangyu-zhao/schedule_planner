@@ -11,6 +11,7 @@ A multi-user, self-hosted daily planner website with three main sections — **S
 The left side of the schedule page is for filling in your **plan**, and the right side is for recording **what actually happened**. Both columns display a 30-minute slot grid from 00:00 to 24:00.
 
 - **Drag to create** — click and drag on empty slots to quickly create an event.
+- **Copy from Plan** — when creating a plan event, click "Copy from Plan" in the new-event dialog to enter selection mode: the calendar remains navigable so you can jump to any date, then click any plan event to copy its title, category, priority, color, and notes into the new event form. Press Esc to return to editing without copying.
 - **Drag to resize** — drag the top or bottom edge of an event to change its duration; overlapping neighbors adjust automatically.
 - **Drag to move** — drag events to reposition them or move them between the Plan and Actual columns.
 - **Linked plan/actual** — creating a plan event automatically generates a matching actual event; deleting either removes both.

@@ -50,7 +50,7 @@ def get_events():
         return jsonify({"error": "日期参数格式不正确"}), 400
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? AND date >= ? AND date <= ? ORDER BY date, start_time",
+        "SELECT * FROM events WHERE user_id=%s AND date >= %s AND date <= %s ORDER BY date, start_time",
         (g.user_id, start, end),
     ).fetchall()
     return jsonify([dict(e) for e in events])
@@ -78,7 +78,7 @@ def create_event():
     cursor = conn.execute(
         """INSERT INTO events (user_id, title, description, date, start_time, end_time,
            color, category, priority, col_type, recur_rule)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
         (
             g.user_id,
             data["title"].strip(),
@@ -94,10 +94,10 @@ def create_event():
         ),
     )
     conn.commit()
-    new_id = cursor.lastrowid
+    new_id = cursor.fetchone()["id"]
 
     new_event = dict(
-        conn.execute("SELECT * FROM events WHERE id=?", (new_id,)).fetchone()
+        conn.execute("SELECT * FROM events WHERE id=%s", (new_id,)).fetchone()
     )
     return jsonify({"event": new_event}), 201
 
@@ -114,7 +114,7 @@ def update_event(event_id):
 
     conn = get_db()
     existing = conn.execute(
-        "SELECT id, col_type FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
+        "SELECT id, col_type FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id)
     ).fetchone()
     if not existing:
         return jsonify({"error": "事件不存在"}), 404
@@ -128,10 +128,10 @@ def update_event(event_id):
         col_type = existing["col_type"]
 
     conn.execute(
-        """UPDATE events SET title=?, description=?, date=?, start_time=?, end_time=?,
+        """UPDATE events SET title=%s, description=%s, date=%s, start_time=%s, end_time=%s,
            color=?, category=?, priority=?, completed=?, recur_rule=?, col_type=?,
-           updated_at=datetime('now','localtime')
-           WHERE id=? AND user_id=?""",
+           updated_at=NOW()
+           WHERE id=%s AND user_id=%s""",
         (
             data["title"].strip(),
             data.get("description", ""),
@@ -149,7 +149,7 @@ def update_event(event_id):
         ),
     )
     conn.commit()
-    event = conn.execute("SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)).fetchone()
+    event = conn.execute("SELECT * FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id)).fetchone()
     return jsonify(dict(event))
 
 
@@ -176,7 +176,7 @@ def batch_update_events():
         if start_time >= end_time:
             continue
         conn.execute(
-            "UPDATE events SET start_time=?, end_time=?, updated_at=datetime('now','localtime') WHERE id=? AND user_id=?",
+            "UPDATE events SET start_time=%s, end_time=%s, updated_at=NOW() WHERE id=%s AND user_id=%s",
             (start_time, end_time, item["id"], g.user_id),
         )
         valid_ids.add(item["id"])
@@ -188,7 +188,7 @@ def batch_update_events():
         if item_id not in valid_ids:
             continue
         row = conn.execute(
-            "SELECT * FROM events WHERE id=? AND user_id=?", (item_id, g.user_id)
+            "SELECT * FROM events WHERE id=%s AND user_id=%s", (item_id, g.user_id)
         ).fetchone()
         if row:
             results.append(dict(row))
@@ -199,7 +199,7 @@ def batch_update_events():
 @login_required
 def delete_event(event_id):
     conn = get_db()
-    event = conn.execute("SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)).fetchone()
+    event = conn.execute("SELECT * FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id)).fetchone()
     if not event:
         return jsonify({"error": "事件不存在"}), 404
     event_data = dict(event)
@@ -207,12 +207,12 @@ def delete_event(event_id):
     conn.execute(
         """INSERT INTO deleted_events (user_id, original_id, title, description, date,
            start_time, end_time, color, category, priority, completed, col_type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
         (g.user_id, event["id"], event["title"], event["description"], event["date"],
          event["start_time"], event["end_time"], event["color"],
          event["category"], event["priority"], event["completed"], event["col_type"]),
     )
-    conn.execute("DELETE FROM events WHERE id=? AND user_id=?", (event_id, g.user_id))
+    conn.execute("DELETE FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id))
     conn.commit()
     return jsonify({"success": True, "event": event_data})
 
@@ -229,7 +229,7 @@ def duplicate_event(event_id):
 
     conn = get_db()
     event = conn.execute(
-        "SELECT * FROM events WHERE id=? AND user_id=?", (event_id, g.user_id)
+        "SELECT * FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id)
     ).fetchone()
     if not event:
         return jsonify({"error": "事件不存在"}), 404
@@ -238,14 +238,14 @@ def duplicate_event(event_id):
     cursor = conn.execute(
         """INSERT INTO events (user_id, title, description, date, start_time, end_time,
            color, category, priority, col_type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
         (g.user_id, src["title"], src.get("description", ""), target_date,
          src["start_time"], src["end_time"], src["color"],
          src.get("category", "其他"), src.get("priority", 2), src.get("col_type", "plan")),
     )
     conn.commit()
-
-    new_event = dict(conn.execute("SELECT * FROM events WHERE id=?", (cursor.lastrowid,)).fetchone())
+    new_id2 = cursor.fetchone()["id"]
+    new_event = dict(conn.execute("SELECT * FROM events WHERE id=%s", (new_id2,)).fetchone())
     return jsonify({"event": new_event}), 201
 
 
@@ -261,7 +261,7 @@ def generate_recurring():
 
     conn = get_db()
     recurring = conn.execute(
-        "SELECT * FROM events WHERE user_id=? AND recur_rule IS NOT NULL AND col_type='plan'",
+        "SELECT * FROM events WHERE user_id=%s AND recur_rule IS NOT NULL AND col_type='plan'",
         (g.user_id,),
     ).fetchall()
 
@@ -277,7 +277,7 @@ def generate_recurring():
         for d in dates:
             ds = d.strftime("%Y-%m-%d")
             existing = conn.execute(
-                "SELECT id FROM events WHERE user_id=? AND date=? AND recur_parent_id=? AND col_type='plan'",
+                "SELECT id FROM events WHERE user_id=%s AND date=%s AND recur_parent_id=%s AND col_type='plan'",
                 (g.user_id, ds, evt["id"]),
             ).fetchone()
             if existing:
@@ -286,7 +286,7 @@ def generate_recurring():
             conn.execute(
                 """INSERT INTO events (user_id, title, description, date, start_time, end_time,
                    color, category, priority, col_type, recur_parent_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'plan', ?)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'plan', %s)""",
                 (g.user_id, evt["title"], evt["description"], ds,
                  evt["start_time"], evt["end_time"], evt["color"],
                  evt["category"], evt["priority"], evt["id"]),
@@ -342,7 +342,7 @@ def _expand_recur(rule, base_date, start_dt, end_dt):
 def get_trash():
     conn = get_db()
     rows = conn.execute(
-        """SELECT * FROM deleted_events WHERE user_id=?
+        """SELECT * FROM deleted_events WHERE user_id=%s
            ORDER BY deleted_at DESC LIMIT 200""",
         (g.user_id,),
     ).fetchall()
@@ -354,7 +354,7 @@ def get_trash():
 def restore_from_trash(item_id):
     conn = get_db()
     item = conn.execute(
-        "SELECT * FROM deleted_events WHERE id=? AND user_id=?", (item_id, g.user_id)
+        "SELECT * FROM deleted_events WHERE id=%s AND user_id=%s", (item_id, g.user_id)
     ).fetchone()
     if not item:
         return jsonify({"error": "回收站中不存在此事件"}), 404
@@ -362,15 +362,15 @@ def restore_from_trash(item_id):
     cursor = conn.execute(
         """INSERT INTO events (user_id, title, description, date, start_time, end_time,
            color, category, priority, completed, col_type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
         (g.user_id, item["title"], item["description"], item["date"],
          item["start_time"], item["end_time"], item["color"],
          item["category"], item["priority"], item["completed"], item["col_type"]),
     )
-    conn.execute("DELETE FROM deleted_events WHERE id=?", (item_id,))
+    conn.execute("DELETE FROM deleted_events WHERE id=%s", (item_id,))
     conn.commit()
-
-    new_event = conn.execute("SELECT * FROM events WHERE id=?", (cursor.lastrowid,)).fetchone()
+    new_id3 = cursor.fetchone()["id"]
+    new_event = conn.execute("SELECT * FROM events WHERE id=%s", (new_id3,)).fetchone()
     return jsonify({"success": True, "event": dict(new_event)})
 
 
@@ -378,7 +378,7 @@ def restore_from_trash(item_id):
 @login_required
 def empty_trash():
     conn = get_db()
-    conn.execute("DELETE FROM deleted_events WHERE user_id=?", (g.user_id,))
+    conn.execute("DELETE FROM deleted_events WHERE user_id=%s", (g.user_id,))
     conn.commit()
     return jsonify({"success": True})
 
@@ -393,7 +393,7 @@ def events_dates():
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
-        "SELECT DISTINCT date FROM events WHERE user_id=? AND date BETWEEN ? AND ? ORDER BY date",
+        "SELECT DISTINCT date FROM events WHERE user_id=%s AND date BETWEEN %s AND %s ORDER BY date",
         (g.user_id, start, end),
     ).fetchall()
     return jsonify([r["date"] for r in rows])
@@ -422,7 +422,7 @@ def search_events():
         except re.error as exc:
             return jsonify({"error": str(exc)}), 400
         rows = conn.execute(
-            "SELECT * FROM events WHERE user_id=? ORDER BY date DESC, start_time LIMIT ?",
+            "SELECT * FROM events WHERE user_id=%s ORDER BY date DESC, start_time LIMIT ?",
             (g.user_id, limit * 20),
         ).fetchall()
         matched, err = run_regex_with_timeout(
@@ -438,7 +438,7 @@ def search_events():
     keyword = f"%{escaped}%"
     fetch_limit = limit * 5 if (case_sensitive or whole_word) else limit
     rows = conn.execute(
-        """SELECT * FROM events WHERE user_id=?
+        """SELECT * FROM events WHERE user_id=%s
            AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
            ORDER BY date DESC, start_time LIMIT ?""",
         (g.user_id, keyword, keyword, fetch_limit),

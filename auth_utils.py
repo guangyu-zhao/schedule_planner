@@ -96,7 +96,7 @@ def get_current_user():
     if not user_id:
         return None
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id = %s", (user_id,)).fetchone()
     if user:
         u = dict(user)
         u.pop("password_hash", None)
@@ -108,7 +108,19 @@ def generate_verification_code():
     return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
-def send_verification_email(email, code):
+def send_verification_email(email: str, code: str) -> bool:
+    """Non-blocking: dispatch email to Celery task queue with sync fallback."""
+    try:
+        from tasks.email_tasks import send_verification_email_task
+        send_verification_email_task.delay(email, code)
+        return True
+    except Exception as e:
+        logger.warning("Celery 不可用，回退同步发送: %s", e)
+        return _send_verification_email_sync(email, code)
+
+
+def _send_verification_email_sync(email: str, code: str) -> bool:
+    """Synchronous SMTP send (fallback when Celery is unavailable)."""
     if not MAIL_USERNAME or not MAIL_PASSWORD:
         logger.info("验证码（开发模式）: %s  邮箱: %s", code, email)
         return True
@@ -146,15 +158,13 @@ def send_verification_email(email, code):
 
 def store_verification_code(email, code, code_type="reset_password"):
     conn = get_db()
-    expires_at = (
-        datetime.now() + timedelta(seconds=VERIFICATION_CODE_EXPIRY)
-    ).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = datetime.now() + timedelta(seconds=VERIFICATION_CODE_EXPIRY)
     conn.execute(
-        "UPDATE verification_codes SET used=1 WHERE email=? AND type=? AND used=0",
+        "UPDATE verification_codes SET used=1 WHERE email=%s AND type=%s AND used=0",
         (email, code_type),
     )
     conn.execute(
-        "INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO verification_codes (email, code, type, expires_at) VALUES (%s, %s, %s, %s)",
         (email, code, code_type, expires_at),
     )
     _cleanup_expired_codes(conn)
@@ -163,19 +173,18 @@ def store_verification_code(email, code, code_type="reset_password"):
 
 def verify_code(email, code, code_type="reset_password"):
     conn = get_db()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute(
+    now = datetime.now()
+    cursor = conn.execute(
         """UPDATE verification_codes SET used=1
            WHERE id = (
                SELECT id FROM verification_codes
-               WHERE email=? AND code=? AND type=? AND used=0 AND expires_at>?
+               WHERE email=%s AND code=%s AND type=%s AND used=0 AND expires_at>%s
                ORDER BY created_at DESC LIMIT 1
            )""",
         (email, code, code_type, now),
     )
-    affected = conn.execute("SELECT changes()").fetchone()[0]
     conn.commit()
-    return affected > 0
+    return cursor.rowcount > 0
 
 
 def check_reset_session_valid():
@@ -199,8 +208,8 @@ def check_reset_session_valid():
 
 def _cleanup_expired_codes(conn):
     """Remove verification codes that expired more than 24 hours ago, or that have been used."""
-    cutoff = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff = datetime.now() - timedelta(hours=24)
     conn.execute(
-        "DELETE FROM verification_codes WHERE expires_at < ? OR used = 1",
+        "DELETE FROM verification_codes WHERE expires_at < %s OR used = 1",
         (cutoff,),
     )

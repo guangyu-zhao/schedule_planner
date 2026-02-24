@@ -17,15 +17,15 @@ def get_stats():
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     total = conn.execute(
-        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='actual'",
+        "SELECT COUNT(*) as count FROM events WHERE user_id=%s AND date = %s AND col_type='actual'",
         (g.user_id, date),
     ).fetchone()["count"]
     completed = conn.execute(
-        "SELECT COUNT(*) as count FROM events WHERE user_id=? AND date = ? AND col_type='actual' AND completed = 1",
+        "SELECT COUNT(*) as count FROM events WHERE user_id=%s AND date = %s AND col_type='actual' AND completed = 1",
         (g.user_id, date),
     ).fetchone()["count"]
     events = conn.execute(
-        "SELECT start_time, end_time FROM events WHERE user_id=? AND date = ? AND col_type='actual'",
+        "SELECT start_time, end_time FROM events WHERE user_id=%s AND date = %s AND col_type='actual'",
         (g.user_id, date),
     ).fetchall()
     total_minutes = 0
@@ -61,11 +61,11 @@ def get_analytics():
 
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? AND date >= ? AND date <= ? ORDER BY date",
+        "SELECT * FROM events WHERE user_id=%s AND date >= %s AND date <= %s ORDER BY date",
         (g.user_id, start, end),
     ).fetchall()
     timer_records = conn.execute(
-        "SELECT * FROM timer_records WHERE user_id=? AND date >= ? AND date <= ? ORDER BY date",
+        "SELECT * FROM timer_records WHERE user_id=%s AND date >= %s AND date <= %s ORDER BY date",
         (g.user_id, start, end),
     ).fetchall()
     return jsonify(
@@ -85,14 +85,14 @@ def get_heatmap():
     conn = get_db()
     events = conn.execute(
         """SELECT date, COUNT(*) as count FROM events
-           WHERE user_id=? AND col_type='actual' AND date >= ? AND date <= ?
+           WHERE user_id=%s AND col_type='actual' AND date >= %s AND date <= %s
            GROUP BY date""",
         (g.user_id, start_date, end_date),
     ).fetchall()
     timer = conn.execute(
         """SELECT date, COUNT(*) as count, COALESCE(SUM(actual_seconds), 0) as seconds
            FROM timer_records
-           WHERE user_id=? AND date >= ? AND date <= ?
+           WHERE user_id=%s AND date >= %s AND date <= %s
            GROUP BY date""",
         (g.user_id, start_date, end_date),
     ).fetchall()
@@ -135,10 +135,10 @@ def get_streak():
     cutoff = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
     rows = conn.execute(
         """SELECT DISTINCT date FROM (
-            SELECT date FROM events WHERE user_id=? AND col_type='actual' AND date >= ?
+            SELECT date FROM events WHERE user_id=%s AND col_type='actual' AND date >= %s
             UNION
-            SELECT date FROM timer_records WHERE user_id=? AND date >= ?
-        ) ORDER BY date DESC""",
+            SELECT date FROM timer_records WHERE user_id=%s AND date >= %s
+        ) AS combined ORDER BY date DESC""",
         (g.user_id, cutoff, g.user_id, cutoff),
     ).fetchall()
 
@@ -170,11 +170,11 @@ def get_streak():
     longest_streak = max(longest_streak, streak)
 
     total_events = conn.execute(
-        "SELECT COUNT(*) as c FROM events WHERE user_id=? AND col_type='actual'",
+        "SELECT COUNT(*) as c FROM events WHERE user_id=%s AND col_type='actual'",
         (g.user_id,),
     ).fetchone()["c"]
     total_focus_seconds = conn.execute(
-        "SELECT COALESCE(SUM(actual_seconds), 0) as s FROM timer_records WHERE user_id=?",
+        "SELECT COALESCE(SUM(actual_seconds), 0) as s FROM timer_records WHERE user_id=%s",
         (g.user_id,),
     ).fetchone()["s"]
 

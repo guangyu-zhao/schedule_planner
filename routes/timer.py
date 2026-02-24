@@ -16,7 +16,7 @@ def get_timer_records():
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     records = conn.execute(
-        "SELECT * FROM timer_records WHERE user_id=? AND date = ? ORDER BY created_at DESC",
+        "SELECT * FROM timer_records WHERE user_id=%s AND date = %s ORDER BY created_at DESC",
         (g.user_id, date),
     ).fetchall()
     return jsonify([dict(r) for r in records])
@@ -55,7 +55,7 @@ def create_timer_record():
     conn = get_db()
     cursor = conn.execute(
         """INSERT INTO timer_records (user_id, task_name, planned_minutes, actual_seconds, date, completed)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
         (
             g.user_id,
             task_name,
@@ -66,8 +66,9 @@ def create_timer_record():
         ),
     )
     conn.commit()
+    new_id = cursor.fetchone()["id"]
     record = conn.execute(
-        "SELECT * FROM timer_records WHERE id = ?", (cursor.lastrowid,)
+        "SELECT * FROM timer_records WHERE id = %s", (new_id,)
     ).fetchone()
     return jsonify(dict(record)), 201
 
@@ -76,7 +77,7 @@ def create_timer_record():
 @login_required
 def delete_timer_record(record_id):
     conn = get_db()
-    conn.execute("DELETE FROM timer_records WHERE id=? AND user_id=?", (record_id, g.user_id))
+    conn.execute("DELETE FROM timer_records WHERE id=%s AND user_id=%s", (record_id, g.user_id))
     conn.commit()
     return jsonify({"success": True})
 
@@ -89,15 +90,15 @@ def get_timer_stats():
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     total = conn.execute(
-        "SELECT COUNT(*) as c FROM timer_records WHERE user_id=? AND date = ?",
+        "SELECT COUNT(*) as c FROM timer_records WHERE user_id=%s AND date = %s",
         (g.user_id, date),
     ).fetchone()["c"]
     completed = conn.execute(
-        "SELECT COUNT(*) as c FROM timer_records WHERE user_id=? AND date = ? AND completed = 1",
+        "SELECT COUNT(*) as c FROM timer_records WHERE user_id=%s AND date = %s AND completed = 1",
         (g.user_id, date),
     ).fetchone()["c"]
     row = conn.execute(
-        "SELECT COALESCE(SUM(actual_seconds), 0) as s FROM timer_records WHERE user_id=? AND date = ?",
+        "SELECT COALESCE(SUM(actual_seconds), 0) as s FROM timer_records WHERE user_id=%s AND date = %s",
         (g.user_id, date),
     ).fetchone()
     return jsonify(

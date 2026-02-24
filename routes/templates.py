@@ -12,7 +12,7 @@ MAX_TEMPLATES = 50
 def get_templates():
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM event_templates WHERE user_id=? ORDER BY created_at DESC",
+        "SELECT * FROM event_templates WHERE user_id=%s ORDER BY created_at DESC",
         (g.user_id,),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
@@ -31,7 +31,7 @@ def create_template():
 
     conn = get_db()
     count = conn.execute(
-        "SELECT COUNT(*) as c FROM event_templates WHERE user_id=?", (g.user_id,)
+        "SELECT COUNT(*) as c FROM event_templates WHERE user_id=%s", (g.user_id,)
     ).fetchone()["c"]
     if count >= MAX_TEMPLATES:
         return jsonify({"error": f"模板数量已达上限 ({MAX_TEMPLATES})"}), 400
@@ -42,7 +42,7 @@ def create_template():
         duration = 60
     cursor = conn.execute(
         """INSERT INTO event_templates (user_id, name, title, description, duration_minutes, color, category, priority)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
         (
             g.user_id,
             name,
@@ -55,7 +55,8 @@ def create_template():
         ),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM event_templates WHERE id=?", (cursor.lastrowid,)).fetchone()
+    new_id = cursor.fetchone()["id"]
+    row = conn.execute("SELECT * FROM event_templates WHERE id=%s", (new_id,)).fetchone()
     return jsonify(dict(row)), 201
 
 
@@ -64,7 +65,7 @@ def create_template():
 def delete_template(template_id):
     conn = get_db()
     conn.execute(
-        "DELETE FROM event_templates WHERE id=? AND user_id=?", (template_id, g.user_id)
+        "DELETE FROM event_templates WHERE id=%s AND user_id=%s", (template_id, g.user_id)
     )
     conn.commit()
     return jsonify({"success": True})

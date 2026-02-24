@@ -1,14 +1,13 @@
 import re
-import time
 import logging
-import threading
-from collections import defaultdict
 from datetime import datetime
 
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from config import MAX_LOGIN_ATTEMPTS, LOGIN_LOCKOUT_SECONDS, SESSION_KEY_PREFIX
 from database import get_db
+from redis_client import get_redis
 from auth_utils import (
     login_required,
     get_current_user,
@@ -26,33 +25,40 @@ auth_bp = Blueprint("auth", __name__)
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
-MAX_LOGIN_ATTEMPTS = 10
-LOGIN_LOCKOUT_SECONDS = 900
-_login_attempts = defaultdict(list)
-_login_attempts_lock = threading.Lock()
-_ATTEMPTS_CLEANUP_INTERVAL = 300
-_last_attempts_cleanup = 0
-
 
 def _validate_email(email):
     return bool(EMAIL_RE.match(email or ""))
 
 
-def _cleanup_login_attempts():
-    global _last_attempts_cleanup
-    now = time.monotonic()
-    if now - _last_attempts_cleanup < _ATTEMPTS_CLEANUP_INTERVAL:
-        return
-    _last_attempts_cleanup = now
-    with _login_attempts_lock:
-        stale_keys = [k for k, v in _login_attempts.items()
-                      if not any(now - t < LOGIN_LOCKOUT_SECONDS for t in v)]
-        for key in stale_keys:
-            del _login_attempts[key]
-        for key in list(_login_attempts):
-            if key not in stale_keys:
-                _login_attempts[key] = [t for t in _login_attempts[key] if now - t < LOGIN_LOCKOUT_SECONDS]
+# ──────────────────────── Redis-based login rate limiting ──────────────────────
 
+def _is_login_locked(email: str) -> tuple[bool, int]:
+    """Return (locked, remaining_seconds)."""
+    r = get_redis()
+    key = f"login_fail:{email}"
+    count = r.get(key)
+    if count and int(count) >= MAX_LOGIN_ATTEMPTS:
+        ttl = r.ttl(key)
+        return True, max(ttl, 0)
+    return False, 0
+
+
+def _record_login_failure(email: str) -> None:
+    r = get_redis()
+    key = f"login_fail:{email}"
+    pipe = r.pipeline()
+    pipe.incr(key)
+    pipe.ttl(key)
+    count, ttl = pipe.execute()
+    if ttl < 0:
+        r.expire(key, LOGIN_LOCKOUT_SECONDS)
+
+
+def _clear_login_failures(email: str) -> None:
+    get_redis().delete(f"login_fail:{email}")
+
+
+# ──────────────────────── Auth endpoints ──────────────────────────────────────
 
 @auth_bp.route("/api/auth/register", methods=["POST"])
 def register():
@@ -71,49 +77,29 @@ def register():
 
     conn = get_db()
     existing = conn.execute(
-        "SELECT id FROM users WHERE email=?", (email,)
+        "SELECT id FROM users WHERE email=%s", (email,)
     ).fetchone()
     if existing:
         return jsonify({"error": "该邮箱已被注册"}), 409
 
     password_hash = generate_password_hash(password)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     language = (data.get("language") or "").strip() or ""
     cursor = conn.execute(
         """INSERT INTO users (email, username, password_hash, last_login, language)
-           VALUES (?, ?, ?, ?, ?)""",
-        (email, username, password_hash, now, language),
+           VALUES (%s, %s, %s, NOW(), %s) RETURNING id""",
+        (email, username, password_hash, language),
     )
     conn.commit()
-    user_id = cursor.lastrowid
+    user_id = cursor.fetchone()["id"]
 
     session.permanent = True
     session["user_id"] = user_id
+    g._new_session_user_id = user_id
 
-    user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (user_id,)).fetchone()
     u = dict(user)
     u.pop("password_hash", None)
     return jsonify({"user": u}), 201
-
-
-def _check_login_lockout(key):
-    now = time.monotonic()
-    with _login_attempts_lock:
-        _login_attempts[key] = [t for t in _login_attempts[key] if now - t < LOGIN_LOCKOUT_SECONDS]
-        if len(_login_attempts[key]) >= MAX_LOGIN_ATTEMPTS:
-            remaining = int(LOGIN_LOCKOUT_SECONDS - (now - _login_attempts[key][0]))
-            return True, remaining
-    return False, 0
-
-
-def _record_login_failure(key):
-    with _login_attempts_lock:
-        _login_attempts[key].append(time.monotonic())
-
-
-def _clear_login_failures(key):
-    with _login_attempts_lock:
-        _login_attempts.pop(key, None)
 
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
@@ -126,35 +112,32 @@ def login():
     if not email or not password:
         return jsonify({"error": "请输入邮箱和密码"}), 400
 
-    _cleanup_login_attempts()
-    lockout_key = email
-    locked, remaining = _check_login_lockout(lockout_key)
+    locked, remaining = _is_login_locked(email)
     if locked:
         logger.warning("登录锁定: %s, 剩余 %ds", email, remaining)
         return jsonify({"error": "登录尝试过多，请稍后重试"}), 429
 
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE email=%s", (email,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], password):
-        _record_login_failure(lockout_key)
+        _record_login_failure(email)
         return jsonify({"error": "邮箱或密码错误"}), 401
 
-    _clear_login_failures(lockout_key)
+    _clear_login_failures(email)
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute("UPDATE users SET last_login=? WHERE id=?", (now, user["id"]))
+    conn.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user["id"],))
     conn.commit()
 
     session.permanent = bool(remember)
     session["user_id"] = user["id"]
+    g._new_session_user_id = user["id"]
 
     u = dict(user)
     u.pop("password_hash", None)
-    u["last_login"] = now
 
     language = data.get("language")
     if language and not u.get("language"):
-        conn.execute("UPDATE users SET language=? WHERE id=?", (language, user["id"]))
+        conn.execute("UPDATE users SET language=%s WHERE id=%s", (language, user["id"]))
         conn.commit()
         u["language"] = language
 
@@ -163,6 +146,16 @@ def login():
 
 @auth_bp.route("/api/auth/logout", methods=["POST"])
 def logout():
+    if hasattr(session, "sid"):
+        try:
+            conn = get_db()
+            conn.execute(
+                "DELETE FROM user_sessions WHERE session_id=%s", (session.sid,)
+            )
+            conn.commit()
+            get_redis().delete(SESSION_KEY_PREFIX + session.sid)
+        except Exception:
+            pass
     session.clear()
     return jsonify({"success": True})
 
@@ -184,7 +177,7 @@ def forgot_password():
         return jsonify({"error": "邮箱格式不正确"}), 400
 
     conn = get_db()
-    user = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+    user = conn.execute("SELECT id FROM users WHERE email=%s", (email,)).fetchone()
 
     if not user:
         return jsonify({"success": True, "message": "如果该邮箱已注册，验证码已发送"})
@@ -232,7 +225,7 @@ def reset_password():
     conn = get_db()
     password_hash = generate_password_hash(password)
     conn.execute(
-        "UPDATE users SET password_hash=?, updated_at=datetime('now','localtime') WHERE email=?",
+        "UPDATE users SET password_hash=%s, updated_at=NOW() WHERE email=%s",
         (password_hash, email),
     )
     conn.commit()
@@ -242,3 +235,87 @@ def reset_password():
     session.pop("reset_verified_at", None)
 
     return jsonify({"success": True, "message": "密码已重置，请重新登录"})
+
+
+# ──────────────────────── Session (device) management ─────────────────────────
+
+@auth_bp.route("/api/auth/sessions", methods=["GET"])
+@login_required
+def list_sessions():
+    """List all active devices for the current user."""
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT id, ip_address, user_agent, created_at, last_active
+           FROM user_sessions WHERE user_id=%s ORDER BY last_active DESC""",
+        (g.user_id,),
+    ).fetchall()
+
+    current_sid = session.sid if hasattr(session, "sid") else None
+    sessions = []
+    for r in rows:
+        d = dict(r)
+        # Don't expose raw session_id; just mark which is current
+        d["is_current"] = (
+            current_sid is not None and
+            conn.execute(
+                "SELECT 1 FROM user_sessions WHERE id=%s AND session_id=%s",
+                (r["id"], current_sid),
+            ).fetchone() is not None
+        )
+        sessions.append(d)
+
+    return jsonify({"sessions": sessions})
+
+
+@auth_bp.route("/api/auth/sessions/<int:db_id>", methods=["DELETE"])
+@login_required
+def revoke_session(db_id):
+    """Revoke a specific device session."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT session_id FROM user_sessions WHERE id=%s AND user_id=%s",
+        (db_id, g.user_id),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "会话不存在"}), 404
+
+    sid = row["session_id"]
+    get_redis().delete(SESSION_KEY_PREFIX + sid)
+    conn.execute("DELETE FROM user_sessions WHERE id=%s", (db_id,))
+    conn.commit()
+    return jsonify({"success": True})
+
+
+@auth_bp.route("/api/auth/sessions/all-others", methods=["DELETE"])
+@login_required
+def revoke_all_other_sessions():
+    """Revoke all sessions except the current one."""
+    conn = get_db()
+    current_sid = session.sid if hasattr(session, "sid") else None
+
+    if current_sid:
+        rows = conn.execute(
+            "SELECT session_id FROM user_sessions WHERE user_id=%s AND session_id!=%s",
+            (g.user_id, current_sid),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT session_id FROM user_sessions WHERE user_id=%s",
+            (g.user_id,),
+        ).fetchall()
+
+    r = get_redis()
+    for row in rows:
+        r.delete(SESSION_KEY_PREFIX + row["session_id"])
+
+    if current_sid:
+        conn.execute(
+            "DELETE FROM user_sessions WHERE user_id=%s AND session_id!=%s",
+            (g.user_id, current_sid),
+        )
+    else:
+        conn.execute(
+            "DELETE FROM user_sessions WHERE user_id=%s", (g.user_id,)
+        )
+    conn.commit()
+    return jsonify({"success": True})

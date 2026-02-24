@@ -159,6 +159,11 @@
                         <select id="profileLanguage" class="profile-lang-select"></select>
                     </div>
                 </div>
+                <div class="profile-section" id="sessionsSection">
+                    <h4 data-i18n="profile.sessions.title">Logged-in Devices</h4>
+                    <div id="sessionsList" class="sessions-list"></div>
+                    <button class="profile-save-btn" onclick="revokeAllSessions()" data-i18n="profile.sessions.revokeAll" style="margin-top:10px;">Sign out all other devices</button>
+                </div>
                 <div class="profile-section danger-zone">
                     <h4 data-i18n="profile.dangerZone">Danger Zone</h4>
                     <p class="danger-text" data-i18n="profile.dangerText">Deleting your account will permanently remove all data and cannot be undone.</p>

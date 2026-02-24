@@ -1,6 +1,11 @@
 flask>=3.0
-flask-limiter
+flask-limiter>=3.5
+flask-session>=0.8
 python-dotenv
 Pillow
+psycopg2-binary
+redis>=5.0
+celery>=5.4
+sentry-sdk[flask]>=2.0
 gunicorn; sys_platform != "win32"
 waitress; sys_platform == "win32"

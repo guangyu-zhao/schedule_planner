@@ -105,6 +105,8 @@ function openProfile() {
         langSelect.value = currentUser?.language || (window.I18n.getLanguage ? window.I18n.getLanguage() : 'en');
         langSelect.onchange = () => changeLanguage(langSelect.value);
     }
+
+    loadSessions();
 }
 
 function closeProfile() {
@@ -451,3 +453,58 @@ window.fetch = async function(...args) {
     }
     return res;
 };
+
+// ── Device / session management ───────────────────────────────────────────────
+
+async function loadSessions() {
+    const list = document.getElementById('sessionsList');
+    if (!list) return;
+    list.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${t('profile.sessions.loading') || '加载中...'}</p>`;
+    try {
+        const res = await fetch('/api/auth/sessions');
+        if (!res.ok) { list.innerHTML = ''; return; }
+        const data = await res.json();
+        const sessions = data.sessions || [];
+        if (!sessions.length) {
+            list.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${t('profile.sessions.empty') || '无其他登录设备'}</p>`;
+            return;
+        }
+        list.innerHTML = sessions.map(s => {
+            const ua = s.user_agent || '';
+            const device = ua.length > 60 ? ua.slice(0, 60) + '…' : ua;
+            const active = s.last_active ? new Date(s.last_active).toLocaleString() : '-';
+            const current = s.is_current ? ` <span class="session-badge-current">${t('profile.sessions.current') || '当前设备'}</span>` : '';
+            const revokeBtn = s.is_current ? '' :
+                `<button class="session-revoke-btn" onclick="revokeSession(${s.id})">${t('profile.sessions.revoke') || '踢出'}</button>`;
+            return `<div class="session-item">
+                <div class="session-info">
+                    <span class="session-device">${device}${current}</span>
+                    <span class="session-meta">${t('profile.sessions.lastActive') || '最后活跃'}: ${active} &nbsp;·&nbsp; IP: ${s.ip_address || '-'}</span>
+                </div>
+                ${revokeBtn}
+            </div>`;
+        }).join('');
+    } catch {
+        list.innerHTML = '';
+    }
+}
+
+async function revokeSession(dbId) {
+    try {
+        const res = await fetch(`/api/auth/sessions/${dbId}`, { method: 'DELETE' });
+        if (res.ok) {
+            loadSessions();
+            if (window.showToast) showToast(t('profile.sessions.revokeSuccess') || '已踢出设备', 'success');
+        }
+    } catch { /* ignore */ }
+}
+
+async function revokeAllSessions() {
+    try {
+        const res = await fetch('/api/auth/sessions/all-others', { method: 'DELETE' });
+        if (res.ok) {
+            loadSessions();
+            if (window.showToast) showToast(t('profile.sessions.revokeAllSuccess') || '已踢出所有其他设备', 'success');
+        }
+    } catch { /* ignore */ }
+}

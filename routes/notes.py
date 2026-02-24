@@ -68,7 +68,7 @@ def upload_note_image():
     try:
         conn = get_db()
         conn.execute(
-            "INSERT INTO note_images (user_id, token, storage_path) VALUES (?, ?, ?)",
+            "INSERT INTO note_images (user_id, token, storage_path) VALUES (%s, %s, %s)",
             (g.user_id, token, storage_path),
         )
         conn.commit()
@@ -88,7 +88,7 @@ def serve_note_image(token):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT storage_path FROM note_images WHERE token=? AND user_id=?",
+        "SELECT storage_path FROM note_images WHERE token=%s AND user_id=%s",
         (token, g.user_id),
     ).fetchone()
     if not row:
@@ -108,7 +108,7 @@ def notes_dates():
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
-        """SELECT DISTINCT date FROM notes WHERE user_id=? AND date BETWEEN ? AND ?
+        """SELECT DISTINCT date FROM notes WHERE user_id=%s AND date BETWEEN %s AND %s
            AND content IS NOT NULL AND content != '' ORDER BY date""",
         (g.user_id, start, end),
     ).fetchall()
@@ -138,7 +138,7 @@ def search_notes():
         except re.error as exc:
             return jsonify({"error": str(exc)}), 400
         rows = conn.execute(
-            "SELECT * FROM notes WHERE user_id=? ORDER BY date DESC LIMIT ?",
+            "SELECT * FROM notes WHERE user_id=%s ORDER BY date DESC LIMIT %s",
             (g.user_id, limit * 20),
         ).fetchall()
         matched, err = run_regex_with_timeout(
@@ -154,8 +154,8 @@ def search_notes():
     keyword = f"%{escaped}%"
     fetch_limit = limit * 5 if (case_sensitive or whole_word) else limit
     rows = conn.execute(
-        """SELECT * FROM notes WHERE user_id=? AND content LIKE ? ESCAPE '\\'
-           ORDER BY date DESC LIMIT ?""",
+        """SELECT * FROM notes WHERE user_id=%s AND content LIKE %s ESCAPE '\\'
+           ORDER BY date DESC LIMIT %s""",
         (g.user_id, keyword, fetch_limit),
     ).fetchall()
 
@@ -180,7 +180,7 @@ def list_notes():
         return jsonify({"error": "日期格式不正确"}), 400
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM notes WHERE user_id=? AND date=? ORDER BY id",
+        "SELECT * FROM notes WHERE user_id=%s AND date=%s ORDER BY id",
         (g.user_id, date),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
@@ -204,11 +204,12 @@ def create_note():
 
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
+        "INSERT INTO notes (user_id, date, content) VALUES (%s, %s, %s) RETURNING id",
         (g.user_id, date, content),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM notes WHERE id=?", (cursor.lastrowid,)).fetchone()
+    new_id = cursor.fetchone()["id"]
+    row = conn.execute("SELECT * FROM notes WHERE id=%s", (new_id,)).fetchone()
     return jsonify(dict(row)), 201
 
 
@@ -225,13 +226,13 @@ def update_note(note_id):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT id FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id)
+        "SELECT id FROM notes WHERE id=%s AND user_id=%s", (note_id, g.user_id)
     ).fetchone()
     if not row:
         return jsonify({"error": "笔记不存在"}), 404
 
     conn.execute(
-        "UPDATE notes SET content=?, updated_at=datetime('now','localtime') WHERE id=? AND user_id=?",
+        "UPDATE notes SET content=%s, updated_at=NOW() WHERE id=%s AND user_id=%s",
         (content, note_id, g.user_id),
     )
     conn.commit()
@@ -244,11 +245,11 @@ def delete_note(note_id):
     """Delete a note by ID."""
     conn = get_db()
     row = conn.execute(
-        "SELECT id FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id)
+        "SELECT id FROM notes WHERE id=%s AND user_id=%s", (note_id, g.user_id)
     ).fetchone()
     if not row:
         return jsonify({"error": "笔记不存在"}), 404
 
-    conn.execute("DELETE FROM notes WHERE id=? AND user_id=?", (note_id, g.user_id))
+    conn.execute("DELETE FROM notes WHERE id=%s AND user_id=%s", (note_id, g.user_id))
     conn.commit()
     return jsonify({"success": True})

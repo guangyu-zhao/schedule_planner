@@ -405,3 +405,28 @@
     .drawer { width: 100vw; }
     .user-name-text { display: none; }
 }
+
+/* ── Device / session list ─────────────────────────────────────────────────── */
+.sessions-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.session-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-secondary); border-radius: var(--radius-sm);
+    padding: 10px 12px; gap: 12px;
+}
+.session-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.session-device { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.session-meta { font-size: 11px; color: var(--text-muted); }
+.session-badge-current {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    background: var(--success-light); color: var(--success);
+    border: 1px solid var(--success); border-radius: 4px;
+    padding: 1px 6px; margin-left: 6px; vertical-align: middle;
+}
+.session-revoke-btn {
+    flex-shrink: 0; font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: var(--radius-sm);
+    border: none; cursor: pointer; font-family: inherit;
+    background: var(--danger-light); color: var(--danger);
+    transition: all 0.15s;
+}
+.session-revoke-btn:hover { background: var(--danger); color: white; }

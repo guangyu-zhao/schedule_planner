@@ -31,7 +31,7 @@ def _allowed_file(filename):
 @login_required
 def get_profile():
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (g.user_id,)).fetchone()
     if not user:
         return jsonify({"error": "用户不存在"}), 404
     u = dict(user)
@@ -58,16 +58,16 @@ def update_profile():
     conn = get_db()
     if language:
         conn.execute(
-            "UPDATE users SET username=?, bio=?, language=?, updated_at=datetime('now','localtime') WHERE id=?",
+            "UPDATE users SET username=%s, bio=%s, language=%s, updated_at=NOW() WHERE id=%s",
             (username, bio, language, g.user_id),
         )
     else:
         conn.execute(
-            "UPDATE users SET username=?, bio=?, updated_at=datetime('now','localtime') WHERE id=?",
+            "UPDATE users SET username=%s, bio=%s, updated_at=NOW() WHERE id=%s",
             (username, bio, g.user_id),
         )
     conn.commit()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (g.user_id,)).fetchone()
     u = dict(user)
     u.pop("password_hash", None)
     return jsonify({"user": u})
@@ -119,12 +119,12 @@ def upload_avatar():
 
     conn = get_db()
     old = conn.execute(
-        "SELECT avatar FROM users WHERE id=?", (g.user_id,)
+        "SELECT avatar FROM users WHERE id=%s", (g.user_id,)
     ).fetchone()
 
     try:
         conn.execute(
-            "UPDATE users SET avatar=?, updated_at=datetime('now','localtime') WHERE id=?",
+            "UPDATE users SET avatar=%s, updated_at=NOW() WHERE id=%s",
             (filename, g.user_id),
         )
         conn.commit()
@@ -152,7 +152,7 @@ def serve_avatar(filename):
 def get_settings():
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM user_settings WHERE user_id=?", (g.user_id,)
+        "SELECT * FROM user_settings WHERE user_id=%s", (g.user_id,)
     ).fetchone()
     if row:
         return jsonify(dict(row))
@@ -174,21 +174,21 @@ def update_settings():
 
     conn = get_db()
     existing = conn.execute(
-        "SELECT id FROM user_settings WHERE user_id=?", (g.user_id,)
+        "SELECT id FROM user_settings WHERE user_id=%s", (g.user_id,)
     ).fetchone()
     if existing:
         conn.execute(
-            "UPDATE user_settings SET daily_goal_hours=?, updated_at=datetime('now','localtime') WHERE user_id=?",
+            "UPDATE user_settings SET daily_goal_hours=%s, updated_at=NOW() WHERE user_id=%s",
             (daily_goal, g.user_id),
         )
     else:
         conn.execute(
-            "INSERT INTO user_settings (user_id, daily_goal_hours) VALUES (?, ?)",
+            "INSERT INTO user_settings (user_id, daily_goal_hours) VALUES (%s, %s)",
             (g.user_id, daily_goal),
         )
     conn.commit()
     row = conn.execute(
-        "SELECT * FROM user_settings WHERE user_id=?", (g.user_id,)
+        "SELECT * FROM user_settings WHERE user_id=%s", (g.user_id,)
     ).fetchone()
     return jsonify(dict(row))
 
@@ -211,13 +211,13 @@ def change_password():
         return jsonify({"error": msg}), 400
 
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (g.user_id,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], old_password):
         return jsonify({"error": "原密码错误"}), 400
 
     password_hash = generate_password_hash(new_password)
     conn.execute(
-        "UPDATE users SET password_hash=?, updated_at=datetime('now','localtime') WHERE id=?",
+        "UPDATE users SET password_hash=%s, updated_at=NOW() WHERE id=%s",
         (password_hash, g.user_id),
     )
     conn.commit()
@@ -230,17 +230,17 @@ def change_password():
 def export_data():
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? ORDER BY date, start_time",
+        "SELECT * FROM events WHERE user_id=%s ORDER BY date, start_time",
         (g.user_id,),
     ).fetchall()
     timer_records = conn.execute(
-        "SELECT * FROM timer_records WHERE user_id=? ORDER BY date, created_at",
+        "SELECT * FROM timer_records WHERE user_id=%s ORDER BY date, created_at",
         (g.user_id,),
     ).fetchall()
     notes = conn.execute(
-        "SELECT * FROM notes WHERE user_id=? ORDER BY date", (g.user_id,)
+        "SELECT * FROM notes WHERE user_id=%s ORDER BY date", (g.user_id,)
     ).fetchall()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (g.user_id,)).fetchone()
     if not user:
         return jsonify({"error": "用户不存在"}), 404
 
@@ -284,11 +284,11 @@ def export_data():
 def export_csv():
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? ORDER BY date, start_time",
+        "SELECT * FROM events WHERE user_id=%s ORDER BY date, start_time",
         (g.user_id,),
     ).fetchall()
     timer_records = conn.execute(
-        "SELECT * FROM timer_records WHERE user_id=? ORDER BY date, created_at",
+        "SELECT * FROM timer_records WHERE user_id=%s ORDER BY date, created_at",
         (g.user_id,),
     ).fetchall()
 
@@ -335,7 +335,7 @@ def export_csv():
 def export_ical():
     conn = get_db()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? AND col_type='actual' ORDER BY date, start_time",
+        "SELECT * FROM events WHERE user_id=%s AND col_type='actual' ORDER BY date, start_time",
         (g.user_id,),
     ).fetchall()
 
@@ -444,7 +444,7 @@ def import_data():
         conn.execute(
             """INSERT INTO events (user_id, title, description, date, start_time, end_time,
                color, category, priority, completed, col_type)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (g.user_id, title, description, e["date"],
              e["start_time"], e["end_time"], color,
              e.get("category", "其他"), priority,
@@ -467,7 +467,7 @@ def import_data():
             continue
         conn.execute(
             """INSERT INTO timer_records (user_id, task_name, planned_minutes, actual_seconds, date, completed)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s)""",
             (g.user_id, task_name, planned, actual,
              r["date"], 1 if r.get("completed") else 0),
         )
@@ -484,7 +484,7 @@ def import_data():
             continue
         content = content[:_MAX_NOTE_LEN]
         conn.execute(
-            "INSERT INTO notes (user_id, date, content) VALUES (?, ?, ?)",
+            "INSERT INTO notes (user_id, date, content) VALUES (%s, %s, %s)",
             (g.user_id, n["date"], content),
         )
         note_count += 1
@@ -505,23 +505,23 @@ def delete_account():
     password = data.get("password") or ""
 
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (g.user_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id=%s", (g.user_id,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "密码错误"}), 400
 
     note_images = conn.execute(
-        "SELECT storage_path FROM note_images WHERE user_id=?", (g.user_id,)
+        "SELECT storage_path FROM note_images WHERE user_id=%s", (g.user_id,)
     ).fetchall()
 
-    conn.execute("DELETE FROM events WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM timer_records WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM notes WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM note_images WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM event_templates WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM user_settings WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM deleted_events WHERE user_id=?", (g.user_id,))
-    conn.execute("DELETE FROM verification_codes WHERE email=(SELECT email FROM users WHERE id=?)", (g.user_id,))
-    conn.execute("DELETE FROM users WHERE id=?", (g.user_id,))
+    conn.execute("DELETE FROM events WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM timer_records WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM notes WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM note_images WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM event_templates WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM user_settings WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM deleted_events WHERE user_id=%s", (g.user_id,))
+    conn.execute("DELETE FROM verification_codes WHERE email=(SELECT email FROM users WHERE id=%s)", (g.user_id,))
+    conn.execute("DELETE FROM users WHERE id=%s", (g.user_id,))
     conn.commit()
 
     storage = get_storage()

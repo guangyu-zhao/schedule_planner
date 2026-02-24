@@ -6,7 +6,27 @@ from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
-DB_PATH = os.path.join(BASE_DIR, "planner.db")
+
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://planner:plannerpass@localhost:5432/planner_db",
+)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND", "redis://localhost:6379/1"
+)
+SESSION_KEY_PREFIX = os.environ.get("SESSION_KEY_PREFIX", "sp_sess:")
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", REDIS_URL.replace("/0", "/2")
+)
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+SENTRY_TRACES_SAMPLE_RATE = float(
+    os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")
+)
+SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "development")
+MAX_LOGIN_ATTEMPTS = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "10"))
+LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900"))
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 

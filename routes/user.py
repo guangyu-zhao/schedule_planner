@@ -9,10 +9,11 @@ from flask import Blueprint, request, jsonify, g, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-from config import ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE
+from config import ALLOWED_AVATAR_EXTENSIONS, AVATAR_MAX_SIZE, SESSION_KEY_PREFIX
 from database import get_db
 from auth_utils import login_required, validate_password, validate_date
 from storage import get_storage
+from redis_client import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +52,16 @@ def update_profile():
     if len(bio) > 200:
         return jsonify({"error": "个人简介不能超过 200 个字符"}), 400
 
+    language_provided = "language" in (data or {})
     language = data.get("language")
     if language and language not in ("en", "zh-CN", "zh-TW", "fr", "de", "ja", "ar", "he"):
         language = None
 
     conn = get_db()
-    if language:
+    if language_provided:
         conn.execute(
             "UPDATE users SET username=%s, bio=%s, language=%s, updated_at=NOW() WHERE id=%s",
-            (username, bio, language, g.user_id),
+            (username, bio, language or None, g.user_id),
         )
     else:
         conn.execute(
@@ -164,13 +166,14 @@ def get_settings():
 def update_settings():
     data = request.json or {}
     daily_goal = data.get("daily_goal_hours")
-    if daily_goal is not None:
-        try:
-            daily_goal = float(daily_goal)
-            if daily_goal < 0.5 or daily_goal > 24:
-                return jsonify({"error": "目标时长需在 0.5-24 小时之间"}), 400
-        except (ValueError, TypeError):
-            return jsonify({"error": "无效的目标时长"}), 400
+    if daily_goal is None:
+        return jsonify({"error": "daily_goal_hours 不能为空"}), 400
+    try:
+        daily_goal = float(daily_goal)
+        if daily_goal < 0.5 or daily_goal > 24:
+            return jsonify({"error": "目标时长需在 0.5-24 小时之间"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "无效的目标时长"}), 400
 
     conn = get_db()
     existing = conn.execute(
@@ -346,6 +349,7 @@ def export_ical():
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         "X-WR-CALNAME:日程规划器",
+        "X-WR-TIMEZONE:UTC",
     ]
     for e in events:
         date_clean = e["date"].replace("-", "")
@@ -355,8 +359,8 @@ def export_ical():
         lines.extend([
             "BEGIN:VEVENT",
             f"UID:{uid}",
-            f"DTSTART:{date_clean}T{start_clean}",
-            f"DTEND:{date_clean}T{end_clean}",
+            f"DTSTART:{date_clean}T{start_clean}Z",
+            f"DTEND:{date_clean}T{end_clean}Z",
             f"SUMMARY:{_ical_escape(e['title'])}",
         ])
         if e["description"]:
@@ -512,6 +516,14 @@ def delete_account():
     note_images = conn.execute(
         "SELECT storage_path FROM note_images WHERE user_id=%s", (g.user_id,)
     ).fetchall()
+
+    # Clear all Redis sessions for this user before deleting the account
+    session_rows = conn.execute(
+        "SELECT session_id FROM user_sessions WHERE user_id=%s", (g.user_id,)
+    ).fetchall()
+    r = get_redis()
+    for sr in session_rows:
+        r.delete(SESSION_KEY_PREFIX + sr["session_id"])
 
     conn.execute("DELETE FROM events WHERE user_id=%s", (g.user_id,))
     conn.execute("DELETE FROM timer_records WHERE user_id=%s", (g.user_id,))

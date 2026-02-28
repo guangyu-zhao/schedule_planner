@@ -146,8 +146,13 @@ def get_streak():
         return jsonify({"current_streak": 0, "longest_streak": 0, "total_active_days": 0})
 
     dates = sorted(set(r["date"] for r in rows), reverse=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    client_today = request.args.get("today", "")
+    if DATE_RE.match(client_today):
+        today = client_today
+        yesterday = (datetime.strptime(client_today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        today = datetime.now().strftime("%Y-%m-%d")
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     current_streak = 0
     if dates[0] == today or dates[0] == yesterday:

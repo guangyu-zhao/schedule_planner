@@ -275,8 +275,7 @@ export const NotesMixin = {
         }
         listEl.innerHTML = notes.map((note, idx) => {
             const raw = (note.content || '').split('\n').find(l => l.trim()) || '';
-            const title = raw.replace(/^#+\s*/, '').replace(/[*_`~\[\]!]/g, '').trim()
-                || t('schedule.unnamedNote');
+            const title = (raw.replace(/^#+\s*/, '').replace(/[*_`~\[\]!]/g, '').trim() || t('schedule.unnamedNote')).slice(0, 80);
             const isActive = note.id === this.currentNoteId;
             return `<div class="notes-list-item${isActive ? ' active' : ''}" data-note-id="${note.id}">
                 <span class="notes-list-num">${idx + 1}</span>
@@ -404,20 +403,31 @@ export const NotesMixin = {
                 return;
             }
             if (noteId === null) {
-                const r = await fetch('/api/notes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ date, content }),
-                });
-                if (!r.ok) {
-                    this.updateSaveIndicator('');
-                    showToast(t('toast.noteSaveFailed'), { type: 'error' });
-                    return;
+                if (this._savingNewNote) return;
+                this._savingNewNote = true;
+                try {
+                    const r = await fetch('/api/notes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date, content }),
+                    });
+                    if (!r.ok) {
+                        this.updateSaveIndicator('');
+                        showToast(t('toast.noteSaveFailed'), { type: 'error' });
+                        return;
+                    }
+                    const data = await r.json();
+                    this.currentNoteId = data.id;
+                    if (!this.notesList.find(n => n.id === data.id)) {
+                        this.notesList.push({ id: data.id, date, content, updated_at: '' });
+                    }
+                } finally {
+                    this._savingNewNote = false;
                 }
-                const data = await r.json();
-                this.currentNoteId = data.id;
-                if (!this.notesList.find(n => n.id === data.id)) {
-                    this.notesList.push({ id: data.id, date, content, updated_at: '' });
+                // If the user typed more content while creation was in-flight, save it now
+                if (this.noteContent !== content && this.noteContent.trim()) {
+                    await this._doSaveNote(date, this.noteContent, this.currentNoteId);
+                    return;
                 }
             } else {
                 const r = await fetch(`/api/notes/${noteId}`, {
@@ -452,9 +462,13 @@ export const NotesMixin = {
         if (this._pendingNoteSave) {
             const { date, content, id } = this._pendingNoteSave;
             this._pendingNoteSave = null;
+            const _t = k => (window.I18n && window.I18n.t) ? window.I18n.t(k) : k;
             if (!content.trim()) {
                 if (id !== null) {
-                    fetch(`/api/notes/${id}`, { method: 'DELETE' }).catch(console.error);
+                    fetch(`/api/notes/${id}`, { method: 'DELETE' }).catch(e => {
+                        console.error(e);
+                        showToast(_t('toast.noteNetworkError'), { type: 'error' });
+                    });
                     this.notesList = this.notesList.filter(n => n.id !== id);
                     if (this.currentNoteId === id) this.currentNoteId = null;
                 }
@@ -473,14 +487,24 @@ export const NotesMixin = {
                             }
                             this._updateNoteCounter();
                         }
+                    } else {
+                        showToast(_t('toast.noteSaveFailed'), { type: 'error' });
                     }
-                }).catch(console.error);
+                }).catch(e => {
+                    console.error(e);
+                    showToast(_t('toast.noteNetworkError'), { type: 'error' });
+                });
             } else {
                 fetch(`/api/notes/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content }),
-                }).catch(console.error);
+                }).then(r => {
+                    if (!r.ok) showToast(_t('toast.noteSaveFailed'), { type: 'error' });
+                }).catch(e => {
+                    console.error(e);
+                    showToast(_t('toast.noteNetworkError'), { type: 'error' });
+                });
             }
         }
     },
@@ -508,8 +532,10 @@ export const NotesMixin = {
                     ADD_TAGS: ['span'],
                     ADD_ATTR: ['class', 'style', 'align', 'width', 'height', 'colspan', 'rowspan'],
                 });
+                preview.innerHTML = html;
+            } else {
+                preview.textContent = this.noteContent;
             }
-            preview.innerHTML = html;
         } else {
             preview.textContent = this.noteContent;
         }

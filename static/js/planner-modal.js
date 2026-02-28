@@ -13,7 +13,7 @@ export const ModalMixin = {
         ss.innerHTML = '';
         es.innerHTML = '';
         for (let i = 0; i < TOTAL_SLOTS; i++) ss.innerHTML += `<option value="${this.slotToTime(i)}">${this.slotToTime(i)}</option>`;
-        for (let i = 1; i <= TOTAL_SLOTS; i++) es.innerHTML += `<option value="${this.slotToTime(i)}">${this.slotToTime(i)}</option>`;
+        for (let i = 1; i < TOTAL_SLOTS; i++) es.innerHTML += `<option value="${this.slotToTime(i)}">${this.slotToTime(i)}</option>`;
     },
 
     buildColorPicker() {
@@ -149,8 +149,8 @@ export const ModalMixin = {
             const result = await this.createEvent(data);
             if (result && result.event) {
                 if (!this._undoing) this.undoHistory.push({ type: 'create', eventIds: [result.event.id] });
+                showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventCreated') : 'Event created');
             }
-            showToast((window.I18n && window.I18n.t) ? window.I18n.t('toast.eventCreated') : 'Event created');
         }
         this.closeModal();
     },

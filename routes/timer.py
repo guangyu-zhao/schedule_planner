@@ -77,8 +77,10 @@ def create_timer_record():
 @login_required
 def delete_timer_record(record_id):
     conn = get_db()
-    conn.execute("DELETE FROM timer_records WHERE id=%s AND user_id=%s", (record_id, g.user_id))
+    cur = conn.execute("DELETE FROM timer_records WHERE id=%s AND user_id=%s", (record_id, g.user_id))
     conn.commit()
+    if cur.rowcount == 0:
+        return jsonify({"error": "记录不存在"}), 404
     return jsonify({"success": True})
 
 

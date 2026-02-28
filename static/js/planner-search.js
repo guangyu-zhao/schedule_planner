@@ -70,9 +70,15 @@ export const SearchMixin = {
                 this._renderSearchDropdown([], err.error);
                 return;
             }
+            if (!noteRes.ok) {
+                const err = await noteRes.json().catch(() => ({}));
+                inp?.classList.add('regex-error');
+                this._renderSearchDropdown([], err.error);
+                return;
+            }
             inp?.classList.remove('regex-error');
             const events = (await evtRes.json()).map(e => ({ ...e, _type: 'event' }));
-            const notes  = noteRes.ok ? (await noteRes.json()).map(n => ({ ...n, _type: 'note' })) : [];
+            const notes  = (await noteRes.json()).map(n => ({ ...n, _type: 'note' }));
             const combined = [...events, ...notes].sort((a, b) => b.date.localeCompare(a.date));
             this._renderSearchDropdown(combined);
         } catch (e) { /* network error: silently ignore */ }

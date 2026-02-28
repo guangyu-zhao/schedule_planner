@@ -129,7 +129,7 @@ def update_event(event_id):
 
     conn.execute(
         """UPDATE events SET title=%s, description=%s, date=%s, start_time=%s, end_time=%s,
-           color=?, category=?, priority=?, completed=?, recur_rule=?, col_type=?,
+           color=%s, category=%s, priority=%s, completed=%s, recur_rule=%s, col_type=%s,
            updated_at=NOW()
            WHERE id=%s AND user_id=%s""",
         (
@@ -150,6 +150,8 @@ def update_event(event_id):
     )
     conn.commit()
     event = conn.execute("SELECT * FROM events WHERE id=%s AND user_id=%s", (event_id, g.user_id)).fetchone()
+    if not event:
+        return jsonify({"error": "事件不存在"}), 404
     return jsonify(dict(event))
 
 
@@ -224,7 +226,7 @@ def duplicate_event(event_id):
     """Copy a single event to a target date."""
     data = request.json or {}
     target_date = data.get("target_date", "")
-    if not DATE_RE.match(target_date):
+    if not validate_date(target_date):
         return jsonify({"error": "目标日期格式不正确"}), 400
 
     conn = get_db()
@@ -261,8 +263,8 @@ def generate_recurring():
 
     conn = get_db()
     recurring = conn.execute(
-        "SELECT * FROM events WHERE user_id=%s AND recur_rule IS NOT NULL AND col_type='plan'",
-        (g.user_id,),
+        "SELECT * FROM events WHERE user_id=%s AND recur_rule IS NOT NULL AND col_type='plan' AND date <= %s",
+        (g.user_id, end),
     ).fetchall()
 
     created = 0
@@ -301,7 +303,7 @@ def generate_recurring():
 def _expand_recur(rule, base_date, start_dt, end_dt):
     """Return list of dates that match a recurrence rule within a range."""
     dates = []
-    limit = 366
+    limit = 60 if rule == "monthly" else 366
 
     if rule == "monthly":
         d = base_date
@@ -422,7 +424,7 @@ def search_events():
         except re.error as exc:
             return jsonify({"error": str(exc)}), 400
         rows = conn.execute(
-            "SELECT * FROM events WHERE user_id=%s ORDER BY date DESC, start_time LIMIT ?",
+            "SELECT * FROM events WHERE user_id=%s ORDER BY date DESC, start_time LIMIT %s",
             (g.user_id, limit * 20),
         ).fetchall()
         matched, err = run_regex_with_timeout(
@@ -433,14 +435,16 @@ def search_events():
             return jsonify({"error": err}), 400
         return jsonify([dict(r) for r in matched[:limit]])
 
-    # Non-regex: use LIKE for initial broad filter, then Python-refine
+    # Non-regex: use LIKE/ILIKE for initial broad filter, then Python-refine
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     keyword = f"%{escaped}%"
     fetch_limit = limit * 5 if (case_sensitive or whole_word) else limit
+    # PostgreSQL LIKE is case-sensitive; use ILIKE for case-insensitive search
+    like_op = "LIKE" if case_sensitive else "ILIKE"
     rows = conn.execute(
-        """SELECT * FROM events WHERE user_id=%s
-           AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
-           ORDER BY date DESC, start_time LIMIT ?""",
+        f"""SELECT * FROM events WHERE user_id=%s
+           AND (title {like_op} %s ESCAPE '\\' OR description {like_op} %s ESCAPE '\\')
+           ORDER BY date DESC, start_time LIMIT %s""",
         (g.user_id, keyword, keyword, fetch_limit),
     ).fetchall()
 

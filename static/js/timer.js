@@ -335,6 +335,8 @@ export class TimerManager {
                 g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.25 + 1.2);
                 o.start(ctx.currentTime + i * 0.25); o.stop(ctx.currentTime + i * 0.25 + 1.2);
             });
+            // Last oscillator ends at index 3: 3*0.25+1.2 = 1.95s; close after 2s
+            setTimeout(() => ctx.close(), 2000);
         } catch (e) { /* no audio */ }
     }
 
@@ -426,7 +428,7 @@ export class TimerManager {
         }
         list.innerHTML = records.map(r => {
             const m = Math.round(r.actual_seconds / 60);
-            const time = r.created_at ? r.created_at.split(' ')[1]?.substring(0, 5) : '';
+            const time = r.created_at ? r.created_at.split(/[ T]/)[1]?.substring(0, 5) : '';
             const timePart = time ? time + ' · ' : '';
             const meta = this.t('timer.recordMeta', { time: timePart, minutes: m, planned: r.planned_minutes });
             const stopped = r.completed ? '' : this.t('timer.recordStopped');

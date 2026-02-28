@@ -183,7 +183,11 @@ def forgot_password():
         return jsonify({"success": True, "message": "如果该邮箱已注册，验证码已发送"})
 
     code = generate_verification_code()
-    store_verification_code(email, code, "reset_password")
+    try:
+        store_verification_code(email, code, "reset_password")
+    except Exception:
+        logger.error("存储验证码失败，邮箱: %s", email)
+        return jsonify({"error": "服务器错误，请稍后重试"}), 500
     sent = send_verification_email(email, code)
     if not sent:
         logger.error("向 %s 发送验证码失败", email)

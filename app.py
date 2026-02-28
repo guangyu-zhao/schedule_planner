@@ -121,13 +121,21 @@ def before_request():
 
         origin = request.headers.get("Origin") or ""
         referer = request.headers.get("Referer") or ""
+        # Support reverse proxy: prefer X-Forwarded-Host/Proto over host_url
+        fwd_host = request.headers.get("X-Forwarded-Host") or ""
+        fwd_proto = request.headers.get("X-Forwarded-Proto") or ""
+        if fwd_host:
+            scheme = fwd_proto or request.scheme
+            allowed_host = f"{scheme}://{fwd_host}"
+        else:
+            allowed_host = request.host_url.rstrip("/")
         if origin:
-            if not origin.startswith(request.host_url.rstrip("/")):
-                logger.warning("CSRF: origin mismatch %s vs %s", origin, request.host_url)
+            if not origin.startswith(allowed_host):
+                logger.warning("CSRF: origin mismatch %s vs %s", origin, allowed_host)
                 return jsonify({"error": "非法请求来源"}), 403
         elif referer:
-            if not referer.startswith(request.host_url):
-                logger.warning("CSRF: referer mismatch %s vs %s", referer, request.host_url)
+            if not referer.startswith(allowed_host):
+                logger.warning("CSRF: referer mismatch %s vs %s", referer, allowed_host)
                 return jsonify({"error": "非法请求来源"}), 403
         else:
             logger.warning("CSRF: no origin/referer for %s %s", request.method, request.path)

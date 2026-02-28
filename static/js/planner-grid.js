@@ -178,10 +178,12 @@ export const GridMixin = {
     },
 
     hexToRgba(hex, a) {
+        if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) hex = '#6c5ce7';
         return `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
     },
 
     getContrastColor(hex) {
+        if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) hex = '#6c5ce7';
         const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#2d3436' : '#ffffff';
     },

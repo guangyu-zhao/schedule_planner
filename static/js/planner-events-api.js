@@ -122,11 +122,17 @@ export const EventsApiMixin = {
 
     async batchUpdateEvents(items) {
         try {
-            await fetch('/api/events/batch', {
+            const r = await fetch('/api/events/batch', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(items),
             });
+            if (!r.ok) {
+                const d = await r.json().catch(() => ({}));
+                const msg = (window.I18n && window.I18n.translateError) ? window.I18n.translateError(d.error) : d.error;
+                showToast(msg || ((window.I18n && window.I18n.t) ? window.I18n.t('toast.updateFailed') : 'Failed to update events'), { type: 'error' });
+                return;
+            }
             await this.fetchEvents();
         } catch (e) { console.error(e); }
     },

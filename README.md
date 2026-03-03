@@ -51,6 +51,16 @@ View data analytics for the selected **day / week / month / all-time** period. S
 - Summary cards: event count, execution hours, focus time, timer completion rate.
 - Charts: execution trend, category distribution, focus trend, priority distribution.
 
+#### To-Do List
+
+Below the calendar in the Schedule section, there is a persistent **To-Do** list:
+
+- **Add** — click the **+** button to type a new to-do item; press Enter or click ↵ to confirm, Escape to cancel.
+- **Complete / Undo** — click the checkbox to strike through an item; click again to unmark it.
+- **Delete** — hover over a row and click the trash icon on the right to remove it.
+
+The to-do list is global (not date-bound), not included in statistics, and not time-tracked.
+
 ### Calendar Sidebar
 
 All three sections have a calendar widget on the left showing the current month, a "Back to Today" button, and the current date. Click any date to jump to that day's records.
@@ -176,7 +186,7 @@ schedule_planner/
 │                           #   full schema creation (users, events,
 │                           #   timer_records, notes, note_images,
 │                           #   event_templates, user_settings,
-│                           #   verification_codes, deleted_events),
+│                           #   verification_codes, deleted_events, todos),
 │                           #   column migrations, index creation,
 │                           #   periodic optimization, and timestamped
 │                           #   backup with rotation.
@@ -223,6 +233,8 @@ schedule_planner/
 │   ├── notes.py            # Notes API: get/save per-date Markdown notes,
 │   │                       #   search notes by keyword, upload/serve
 │   │                       #   note images via OSS abstraction.
+│   ├── todos.py            # Todos API: CRUD for the sidebar to-do list
+│   │                       #   (global, not date-bound; max 200 per user).
 │   ├── stats.py            # Statistics API: daily stats (event count,
 │   │                       #   hours, completion rate), date-range analytics,
 │   │                       #   activity heatmap, streak calculation.
@@ -310,6 +322,8 @@ schedule_planner/
 │       ├── planner-notes.js     # NotesMixin — multi-note management,
 │       │                        #   Markdown editor with live preview,
 │       │                        #   image upload, auto-save, note list.
+│       ├── planner-todo.js      # TodoMixin — sidebar to-do list: fetch,
+│       │                        #   render, add, toggle complete, delete.
 │       └── planner-search.js    # SearchMixin — keyword search across
 │                                #   events and notes, jump-to-date.
 │       ├── timer.js        # TimerManager class — countdown logic with
@@ -404,6 +418,15 @@ schedule_planner/
 | GET | `/api/stats/heatmap` | Activity heatmap (past year) |
 | GET | `/api/stats/streak` | Streak & productivity data |
 | GET | `/api/analytics?start=&end=` | Analytics for date range |
+
+### To-Do List
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/todos` | List all to-do items |
+| POST | `/api/todos` | Create a to-do item |
+| PUT | `/api/todos/<id>` | Update to-do (done, text) |
+| DELETE | `/api/todos/<id>` | Delete a to-do item |
 
 ### Templates
 

@@ -189,6 +189,19 @@ def init_db():
 
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            done INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """
+    )
+
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS deleted_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -225,6 +238,7 @@ def _migrate(conn):
     _migrate_notes(conn)
     _migrate_note_images(conn)
     _migrate_notes_to_multi(conn)
+    _migrate_todos(conn)
     _create_indexes(conn)
 
 
@@ -326,6 +340,22 @@ def _migrate_note_images(conn):
     )
 
 
+def _migrate_todos(conn):
+    """Ensure todos table exists (for older DBs that lack it)."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            done INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """
+    )
+
+
 def _create_indexes(conn):
     indexes = [
         "CREATE INDEX IF NOT EXISTS idx_notes_user_date ON notes(user_id, date)",
@@ -340,6 +370,7 @@ def _create_indexes(conn):
         "CREATE INDEX IF NOT EXISTS idx_deleted_events_user ON deleted_events(user_id, deleted_at)",
         "CREATE INDEX IF NOT EXISTS idx_note_images_token ON note_images(token)",
         "CREATE INDEX IF NOT EXISTS idx_note_images_user ON note_images(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_todos_user ON todos(user_id, sort_order)",
     ]
     for sql in indexes:
         try:

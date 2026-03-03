@@ -51,6 +51,16 @@
 - 汇总卡片：事项数、执行时长、专注时长、计时完成率。
 - 图表：执行趋势、分类分布、专注趋势、优先级分布。
 
+#### 待办清单
+
+日程栏目的日历下方有一个全局**待办清单**：
+
+- **添加** — 点击 **+** 按钮输入待办内容，回车或点击 ↵ 确认，Escape 取消。
+- **完成/取消完成** — 点击前面的小方块划掉该条目，再次点击取消划掉。
+- **删除** — 鼠标悬停在某条待办上，点击行末的垃圾桶图标即可删除。
+
+待办清单是全局的（不绑定日期），不计入数据统计，也不记录时间。
+
 ### 日历侧栏
 
 三个栏目的最左侧都有一个日历组件，显示当月日历、"回到今天"按钮和当天日期。点击其它日期可以跳转到当天，查看当天的相关记录。
@@ -175,7 +185,7 @@ schedule_planner/
 │                           #   创建（users、events、timer_records、
 │                           #   notes、note_images、event_templates、
 │                           #   user_settings、verification_codes、
-│                           #   deleted_events），列迁移、索引创建、
+│                           #   deleted_events、todos），列迁移、索引创建、
 │                           #   周期性优化、带时间戳的自动备份与轮转。
 │
 ├── auth_utils.py           # 认证工具 — @login_required 装饰器、
@@ -217,6 +227,8 @@ schedule_planner/
 │   ├── notes.py            # 笔记 API：按日期获取/保存 Markdown 笔记，
 │   │                       #   按关键字搜索笔记，通过 OSS 抽象层
 │   │                       #   上传并访问笔记图片。
+│   ├── todos.py            # 待办 API：侧栏待办清单的增删改查
+│   │                       #   （全局，不绑定日期；每用户上限 200 条）。
 │   ├── stats.py            # 统计 API：每日统计（事件数、时长、
 │   │                       #   完成率）、日期范围分析、活动热力图、
 │   │                       #   连续打卡天数计算。
@@ -300,6 +312,8 @@ schedule_planner/
 │       ├── planner-notes.js     # NotesMixin — 多笔记管理、Markdown
 │       │                        #   编辑器（实时预览）、图片插入、
 │       │                        #   自动保存、笔记列表视图。
+│       ├── planner-todo.js      # TodoMixin — 侧栏待办清单：获取、
+│       │                        #   渲染、添加、切换完成状态、删除。
 │       └── planner-search.js    # SearchMixin — 关键字搜索日程与笔记、
 │                                #   搜索结果跳转到对应日期。
 │       ├── timer.js        # TimerManager 类 — 倒计时逻辑
@@ -394,6 +408,15 @@ schedule_planner/
 | GET | `/api/stats/heatmap` | 活动热力图（过去一年） |
 | GET | `/api/stats/streak` | 连续打卡与生产力数据 |
 | GET | `/api/analytics?start=&end=` | 日期范围分析数据 |
+
+### 待办清单
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/todos` | 获取所有待办条目 |
+| POST | `/api/todos` | 创建待办条目 |
+| PUT | `/api/todos/<id>` | 更新待办（完成状态、内容） |
+| DELETE | `/api/todos/<id>` | 删除待办条目 |
 
 ### 事件模板
 

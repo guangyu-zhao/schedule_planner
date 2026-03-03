@@ -334,7 +334,11 @@
       'error.invalidDateFormat': 'Invalid date format',
       'error.invalidTimeFormat': 'Invalid time format',
       'error.descriptionTooLong': 'Notes cannot exceed 5000 characters',
-      'error.endBeforeStart': 'End time must be after start time'
+      'error.endBeforeStart': 'End time must be after start time',
+      'todo.title': 'To-Do',
+      'todo.add': 'Add',
+      'todo.placeholder': 'New to-do...',
+      'todo.delete': 'Delete'
     },
     'zh-CN': {
       'app.title': '日程计划',
@@ -666,7 +670,11 @@
       'error.invalidDateFormat': '日期格式不正确',
       'error.invalidTimeFormat': '时间格式不正确',
       'error.descriptionTooLong': '备注不能超过 5000 个字符',
-      'error.endBeforeStart': '结束时间必须晚于开始时间'
+      'error.endBeforeStart': '结束时间必须晚于开始时间',
+      'todo.title': '待办',
+      'todo.add': '添加',
+      'todo.placeholder': '新建待办...',
+      'todo.delete': '删除'
     },
     'zh-TW': {
       'app.title': '日程計劃',
@@ -998,7 +1006,11 @@
       'error.invalidDateFormat': '日期格式不正確',
       'error.invalidTimeFormat': '時間格式不正確',
       'error.descriptionTooLong': '備註不能超過 5000 個字元',
-      'error.endBeforeStart': '結束時間必須晚於開始時間'
+      'error.endBeforeStart': '結束時間必須晚於開始時間',
+      'todo.title': '待辦',
+      'todo.add': '新增',
+      'todo.placeholder': '新增待辦...',
+      'todo.delete': '刪除'
     },
     'fr': {
       'app.title': 'Planificateur d\'emploi du temps',
@@ -1330,7 +1342,11 @@
       'error.invalidDateFormat': 'Format de date invalide',
       'error.invalidTimeFormat': 'Format d\'heure invalide',
       'error.descriptionTooLong': 'Les notes ne peuvent pas dépasser 5000 caractères',
-      'error.endBeforeStart': 'L\'heure de fin doit être après l\'heure de début'
+      'error.endBeforeStart': 'L\'heure de fin doit être après l\'heure de début',
+      'todo.title': 'À faire',
+      'todo.add': 'Ajouter',
+      'todo.placeholder': 'Nouvelle tâche...',
+      'todo.delete': 'Supprimer'
     },
     'de': {
       'app.title': 'Terminplaner',
@@ -1662,7 +1678,11 @@
       'error.invalidDateFormat': 'Ungültiges Datumsformat',
       'error.invalidTimeFormat': 'Ungültiges Zeitformat',
       'error.descriptionTooLong': 'Notizen dürfen maximal 5000 Zeichen haben',
-      'error.endBeforeStart': 'Endzeit muss nach Startzeit liegen'
+      'error.endBeforeStart': 'Endzeit muss nach Startzeit liegen',
+      'todo.title': 'Aufgaben',
+      'todo.add': 'Hinzufügen',
+      'todo.placeholder': 'Neue Aufgabe...',
+      'todo.delete': 'Löschen'
     },
     'ja': {
       'app.title': 'スケジュールプランナー',
@@ -1994,7 +2014,11 @@
       'error.invalidDateFormat': '日付の形式が正しくありません',
       'error.invalidTimeFormat': '時刻の形式が正しくありません',
       'error.descriptionTooLong': 'メモは5000文字以内にしてください',
-      'error.endBeforeStart': '終了時刻は開始時刻より後にしてください'
+      'error.endBeforeStart': '終了時刻は開始時刻より後にしてください',
+      'todo.title': 'やること',
+      'todo.add': '追加',
+      'todo.placeholder': '新しいタスク...',
+      'todo.delete': '削除'
     },
     'ar': {
       'app.title': 'مخطط الجدول الزمني',
@@ -2326,7 +2350,11 @@
       'error.invalidDateFormat': 'تنسيق التاريخ غير صالح',
       'error.invalidTimeFormat': 'تنسيق الوقت غير صالح',
       'error.descriptionTooLong': 'لا يمكن أن تتجاوز الملاحظات 5000 حرف',
-      'error.endBeforeStart': 'يجب أن يكون وقت النهاية بعد وقت البداية'
+      'error.endBeforeStart': 'يجب أن يكون وقت النهاية بعد وقت البداية',
+      'todo.title': 'المهام',
+      'todo.add': 'إضافة',
+      'todo.placeholder': 'مهمة جديدة...',
+      'todo.delete': 'حذف'
     },
     'he': {
       'app.title': 'מתכנן לוח זמנים',
@@ -2658,7 +2686,11 @@
       'error.invalidDateFormat': 'פורמט תאריך לא תקין',
       'error.invalidTimeFormat': 'פורמט שעה לא תקין',
       'error.descriptionTooLong': 'ההערות לא יכולות לעבור 5000 תווים',
-      'error.endBeforeStart': 'שעת הסיום חייבת להיות אחרי שעת ההתחלה'
+      'error.endBeforeStart': 'שעת הסיום חייבת להיות אחרי שעת ההתחלה',
+      'todo.title': 'מטלות',
+      'todo.add': 'הוסף',
+      'todo.placeholder': 'משימה חדשה...',
+      'todo.delete': 'מחק'
     }
   };
 

@@ -3,6 +3,17 @@
         <div class="schedule-sidebar">
             <div class="schedule-cal" id="scheduleCal"></div>
             <div class="schedule-date-label" id="scheduleDateLabel"></div>
+            <div class="todo-panel" id="todoPanel">
+                <div class="todo-header">
+                    <span class="todo-title" data-i18n="todo.title">To-Do</span>
+                    <button class="todo-add-btn" id="todoAddBtn" data-i18n-title="todo.add" title="Add">+</button>
+                </div>
+                <div class="todo-input-row" id="todoInputRow" style="display:none">
+                    <input type="text" id="todoInput" class="todo-input" data-i18n-placeholder="todo.placeholder" placeholder="New to-do..." maxlength="500">
+                    <button class="todo-input-confirm" id="todoInputConfirm">↵</button>
+                </div>
+                <ul class="todo-list" id="todoList"></ul>
+            </div>
         </div>
         <div class="schedule-main">
             <div class="schedule-grid-panel">

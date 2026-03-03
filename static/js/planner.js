@@ -7,6 +7,7 @@ import { DragMixin } from './planner-drag.js';
 import { ModalMixin } from './planner-modal.js';
 import { NotesMixin } from './planner-notes.js';
 import { SearchMixin } from './planner-search.js';
+import { TodoMixin } from './planner-todo.js';
 
 export class PlannerApp {
     constructor() {
@@ -76,6 +77,7 @@ export class PlannerApp {
         this.initSearch();
         this.bindDocumentDragEvents();
         this.initNotes();
+        this.initTodo();
         this.renderCalendar();
         this.renderGrid();
         this.fetchEvents();
@@ -197,4 +199,5 @@ Object.assign(PlannerApp.prototype,
     ModalMixin,
     NotesMixin,
     SearchMixin,
+    TodoMixin,
 );

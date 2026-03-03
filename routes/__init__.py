@@ -6,6 +6,7 @@ from routes.timer import timer_bp
 from routes.notes import notes_bp
 from routes.stats import stats_bp
 from routes.templates import templates_bp
+from routes.todos import todos_bp
 
 
 def register_blueprints(app):
@@ -17,3 +18,4 @@ def register_blueprints(app):
     app.register_blueprint(notes_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(templates_bp)
+    app.register_blueprint(todos_bp)

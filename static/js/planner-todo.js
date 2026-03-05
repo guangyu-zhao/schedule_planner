@@ -45,6 +45,7 @@ export const TodoMixin = {
             const textEl = document.createElement('span');
             textEl.className = 'todo-text';
             textEl.textContent = todo.text;
+            textEl.addEventListener('click', () => this._startEditTodo(todo.id, li, textEl));
 
             const delBtn = document.createElement('button');
             delBtn.className = 'todo-delete-btn';
@@ -90,6 +91,58 @@ export const TodoMixin = {
             this._renderTodoList();
             this._hideTodoInput();
         } catch (e) { /* ignore */ }
+    },
+
+    _startEditTodo(id, li, textEl) {
+        if (li.classList.contains('todo-editing')) return;
+        li.classList.add('todo-editing');
+        const originalText = textEl.textContent;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'todo-edit-input';
+        input.value = originalText;
+        input.maxLength = 500;
+        textEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        let committed = false;
+
+        const restore = () => {
+            input.replaceWith(textEl);
+            li.classList.remove('todo-editing');
+        };
+
+        const save = async () => {
+            if (committed) return;
+            committed = true;
+            const newText = input.value.trim();
+            if (!newText || newText === originalText) { restore(); return; }
+            try {
+                const res = await fetch(`/api/todos/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: newText }),
+                });
+                if (!res.ok) { restore(); return; }
+                const todo = this.todos.find(t => t.id === id);
+                if (todo) todo.text = newText;
+                this._renderTodoList();
+            } catch (e) { restore(); }
+        };
+
+        const cancel = () => {
+            if (committed) return;
+            committed = true;
+            restore();
+        };
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); save(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', () => save());
     },
 
     async _toggleTodo(id, done) {

@@ -42,6 +42,30 @@ optimize_db()
 register_blueprints(app)
 
 
+def _compute_static_version():
+    """Compute a version token from the latest mtime of static JS/CSS files."""
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    max_mtime = 0
+    for root, _, files in os.walk(static_dir):
+        for fname in files:
+            if fname.endswith((".js", ".css")):
+                try:
+                    mtime = os.path.getmtime(os.path.join(root, fname))
+                    if mtime > max_mtime:
+                        max_mtime = mtime
+                except OSError:
+                    pass
+    return str(int(max_mtime)) if max_mtime else "1"
+
+
+_STATIC_VERSION = _compute_static_version()
+
+
+@app.context_processor
+def inject_static_version():
+    return {"static_v": _STATIC_VERSION}
+
+
 @app.before_request
 def before_request():
     g.request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])

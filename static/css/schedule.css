@@ -964,10 +964,28 @@ body.plan-pick-mode .col-plan .event.completed {
     color: var(--text-primary);
     line-height: 1.4;
     word-break: break-word;
+    cursor: text;
 }
 .todo-done .todo-text {
     text-decoration: line-through;
     color: var(--text-secondary);
+}
+
+.todo-edit-input {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 1px 5px;
+    outline: none;
+    line-height: 1.4;
+    min-width: 0;
+}
+
+.todo-editing .todo-delete-btn {
+    display: none;
 }
 
 .todo-delete-btn {

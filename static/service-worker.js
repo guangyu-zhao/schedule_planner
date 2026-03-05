@@ -1,4 +1,4 @@
-const CACHE_NAME = 'schedule-planner-v6';
+const CACHE_NAME = 'schedule-planner-v7';
 const STATIC_ASSETS = [
     '/',
     '/static/css/base.css',
@@ -8,12 +8,21 @@ const STATIC_ASSETS = [
     '/static/css/stats.css',
     '/static/css/components.css',
     '/static/css/user.css',
+    '/static/js/i18n.js',
     '/static/js/app.js',
     '/static/js/auth.js',
     '/static/js/user.js',
     '/static/js/constants.js',
     '/static/js/helpers.js',
     '/static/js/planner.js',
+    '/static/js/planner-calendar.js',
+    '/static/js/planner-drag.js',
+    '/static/js/planner-events-api.js',
+    '/static/js/planner-grid.js',
+    '/static/js/planner-modal.js',
+    '/static/js/planner-notes.js',
+    '/static/js/planner-search.js',
+    '/static/js/planner-todo.js',
     '/static/js/timer.js',
     '/static/js/stats.js',
 ];

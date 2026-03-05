@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedule Planner - Login</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
-    <link rel="stylesheet" href="/static/css/auth.css">
+    <link rel="stylesheet" href="/static/css/auth.css?v={{ static_v }}">
 </head>
 <body>
     <div class="auth-container">
@@ -160,7 +160,7 @@
             else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
         })();
     </script>
-    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/i18n.js?v={{ static_v }}"></script>
     <script>
         (function() {
             var sel = document.getElementById('langSelect');
@@ -187,6 +187,6 @@
             }
         }
     </script>
-    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/auth.js?v={{ static_v }}"></script>
 </body>
 </html>
